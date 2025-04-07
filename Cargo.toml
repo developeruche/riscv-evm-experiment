@@ -21,3 +21,6 @@ revm-inspectors = "0.18.0"
 
 #anyhow 
 anyhow = "1.0.97"
+
+#alloy
+alloy-sol-types = { version = "0.8.2", default-features = false }

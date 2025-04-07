@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 revm.workspace = true
 anyhow.workspace = true
+alloy-sol-types = { workspace = true, features = ["std"] }
 
 
 
