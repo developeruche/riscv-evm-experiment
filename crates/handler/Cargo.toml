@@ -1,0 +1,8 @@
+[package]
+name = "handler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+primitives.workspace = true
+revm.workspace = true

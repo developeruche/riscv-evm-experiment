@@ -1,5 +1,5 @@
 [workspace]
-members = [ "bins/e2e-tests","crates/benchmarks"]
+members = [ "bins/e2e-tests","crates/benchmarks", "crates/handler", "crates/primitives"]
 
 
 
@@ -24,3 +24,6 @@ anyhow = "1.0.97"
 
 #alloy
 alloy-sol-types = { version = "0.8.2", default-features = false }
+
+#workspace crates
+primitives = { path = "crates/primitives"}

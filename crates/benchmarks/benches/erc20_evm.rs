@@ -2,6 +2,7 @@
 //! Performing benches on tasks such as deployment, transfer and balanceOf.
 use criterion::{Criterion, criterion_group, criterion_main};
 
+use alloy_sol_types::{SolCall, sol};
 use revm::{
     ExecuteCommitEvm, MainBuilder, MainContext,
     context::Context,
@@ -11,7 +12,6 @@ use revm::{
     handler::EvmTr,
     primitives::{Address, Bytes, TxKind, U256, address, hex},
 };
-use alloy_sol_types::{sol, SolCall};
 
 const FROM: Address = address!("5B38Da6a701c568545dCfcB03FcB875f56beddC4");
 const TO: Address = address!("Ab8483F64d9C6d1EcF9b849Ae677dD3315835cb2");
@@ -51,105 +51,113 @@ fn bench_erc20_deployment(c: &mut Criterion) {
 }
 
 fn bench_erc20_transfer(c: &mut Criterion) {
-    c.bench_function("EVM: Bench ERC20 Transfer", |b| b.iter(|| {
-        let bytecode: Bytes = erc20_bytescode_and_initcode();
-        let ctx = Context::mainnet()
-            .modify_tx_chained(|tx| {
+    c.bench_function("EVM: Bench ERC20 Transfer", |b| {
+        b.iter(|| {
+            let bytecode: Bytes = erc20_bytescode_and_initcode();
+            let ctx = Context::mainnet()
+                .modify_tx_chained(|tx| {
+                    tx.caller = FROM;
+                    tx.kind = TxKind::Create;
+                    tx.data = bytecode.clone();
+                    tx.value = U256::from(0);
+                })
+                .with_db(CacheDB::<EmptyDB>::default());
+
+            let mut evm = ctx.build_mainnet();
+            let ref_tx = evm.replay_commit().unwrap();
+            let ExecutionResult::Success {
+                output: Output::Create(_, Some(token_address)),
+                ..
+            } = ref_tx
+            else {
+                panic!("Failed to create contract: {ref_tx:#?}");
+            };
+
+            sol! {
+                function transfer(address to, uint amount) external returns (bool);
+            }
+
+            let encoded = transferCall {
+                to: TO,
+                amount: U256::from(100),
+            }
+            .abi_encode();
+
+            evm.ctx().modify_tx(|tx| {
+                tx.nonce = 1;
                 tx.caller = FROM;
-                tx.kind = TxKind::Create;
-                tx.data = bytecode.clone();
+                tx.kind = TxKind::Call(token_address);
+                tx.data = encoded.into();
                 tx.value = U256::from(0);
-            })
-            .with_db(CacheDB::<EmptyDB>::default());
-    
-        let mut evm = ctx.build_mainnet();
-        let ref_tx = evm.replay_commit().unwrap();
-        let ExecutionResult::Success {
-            output: Output::Create(_, Some(token_address)),
-            ..
-        } = ref_tx
-        else {
-            panic!("Failed to create contract: {ref_tx:#?}");
-        };
-        
-        sol! {
-            function transfer(address to, uint amount) external returns (bool);
-        }
-        
-        let encoded = transferCall { to: TO, amount: U256::from(100) }.abi_encode();
-        
-        evm.ctx().modify_tx(|tx| {
-            tx.nonce = 1;
-            tx.caller = FROM;
-            tx.kind = TxKind::Call(token_address);
-            tx.data = encoded.into();
-            tx.value = U256::from(0);
-        });
-        
-        let ref_tx = evm.replay_commit().unwrap();
-        
-        let ExecutionResult::Success {
-            output: Output::Call(_return_bytes),
-            ..
-        } = ref_tx
-        else {
-            panic!("Failed to create contract: {ref_tx:#?}");
-        };
-    }));
+            });
+
+            let ref_tx = evm.replay_commit().unwrap();
+
+            let ExecutionResult::Success {
+                output: Output::Call(_return_bytes),
+                ..
+            } = ref_tx
+            else {
+                panic!("Failed to create contract: {ref_tx:#?}");
+            };
+        })
+    });
 }
 
 fn bench_erc20_balance_of(c: &mut Criterion) {
-    c.bench_function("EVM: Bench ERC20 Transfer", |b| b.iter(|| {
-        let bytecode: Bytes = erc20_bytescode_and_initcode();
-        let ctx = Context::mainnet()
-            .modify_tx_chained(|tx| {
+    c.bench_function("EVM: Bench ERC20 Transfer", |b| {
+        b.iter(|| {
+            let bytecode: Bytes = erc20_bytescode_and_initcode();
+            let ctx = Context::mainnet()
+                .modify_tx_chained(|tx| {
+                    tx.caller = FROM;
+                    tx.kind = TxKind::Create;
+                    tx.data = bytecode.clone();
+                    tx.value = U256::from(0);
+                })
+                .with_db(CacheDB::<EmptyDB>::default());
+
+            let mut evm = ctx.build_mainnet();
+
+            let ref_tx = evm.replay_commit().unwrap();
+            let ExecutionResult::Success {
+                output: Output::Create(_, Some(token_address)),
+                ..
+            } = ref_tx
+            else {
+                panic!("Failed to create contract: {ref_tx:#?}");
+            };
+
+            sol! {
+                function balanceOf(address owner) external view returns (uint);
+            }
+
+            let encoded = balanceOfCall { owner: FROM }.abi_encode();
+
+            evm.ctx().modify_tx(|tx| {
+                tx.nonce = 1;
                 tx.caller = FROM;
-                tx.kind = TxKind::Create;
-                tx.data = bytecode.clone();
+                tx.kind = TxKind::Call(token_address);
+                tx.data = encoded.into();
                 tx.value = U256::from(0);
-            })
-            .with_db(CacheDB::<EmptyDB>::default());
-        
-        let mut evm = ctx.build_mainnet();
-        
-        let ref_tx = evm.replay_commit().unwrap();
-        let ExecutionResult::Success {
-            output: Output::Create(_, Some(token_address)),
-            ..
-        } = ref_tx
-        else {
-            panic!("Failed to create contract: {ref_tx:#?}");
-        };
-        
-        sol! {
-            function balanceOf(address owner) external view returns (uint);
-        }
-        
-        let encoded = balanceOfCall { owner: FROM }.abi_encode();
-        
-        evm.ctx().modify_tx(|tx| {
-            tx.nonce = 1;
-            tx.caller = FROM;
-            tx.kind = TxKind::Call(token_address);
-            tx.data = encoded.into();
-            tx.value = U256::from(0);
-        });
-        
-        let ref_tx = evm.replay_commit().unwrap();
-        
-        let ExecutionResult::Success {
-            output: Output::Call(_return_bytes),
-            ..
-        } = ref_tx
-        else {
-            panic!("Failed to create contract: {ref_tx:#?}");
-        };
-    }));
+            });
+
+            let ref_tx = evm.replay_commit().unwrap();
+
+            let ExecutionResult::Success {
+                output: Output::Call(_return_bytes),
+                ..
+            } = ref_tx
+            else {
+                panic!("Failed to create contract: {ref_tx:#?}");
+            };
+        })
+    });
 }
 
 criterion_group!(
-    benches, 
-    bench_erc20_deployment, 
+    benches,
+    bench_erc20_deployment,
     bench_erc20_transfer,
     bench_erc20_balance_of,
 );
