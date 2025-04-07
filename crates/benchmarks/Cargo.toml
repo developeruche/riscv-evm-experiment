@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 revm.workspace = true
+anyhow.workspace = true
 
 
 
