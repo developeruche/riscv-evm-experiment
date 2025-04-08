@@ -8,11 +8,12 @@ use revm::{
             FromStringError, HaltReasonTr, InvalidHeader, InvalidTransaction, ResultAndState,
         },
     },
-    handler::{Frame, FrameResult, validation},
+    context_interface::context::ContextError,
+    handler::{Frame, FrameResult, post_execution, validation},
     interpreter::{FrameInput, InitialAndFloorGas},
 };
 
-use crate::pre_execution;
+use crate::{execution, pre_execution};
 
 pub trait EvmTrError<EVM: RiscvEvmTr>:
     From<InvalidTransaction>
@@ -150,6 +151,21 @@ pub trait Handler<CTX: ContextTr> {
         Ok(frame_result)
     }
 
+    /// Creates initial frame input using transaction parameters, gas limit and configuration.
+    #[inline]
+    fn first_frame_input(
+        &mut self,
+        evm: &mut Self::RiscvEVM,
+        gas_limit: u64,
+    ) -> Result<FrameInput, Self::Error> {
+        let ctx: &<<Self as Handler<CTX>>::RiscvEVM as RiscvEvmTr>::Context = evm.ctx_ref();
+        Ok(execution::create_init_frame(
+            ctx.tx(),
+            ctx.cfg().spec().into(),
+            gas_limit,
+        ))
+    }
+
     //=========================
     // Post-Execution
     // ========================
@@ -172,6 +188,75 @@ pub trait Handler<CTX: ContextTr> {
         self.reward_beneficiary(evm, &mut exec_result)?;
         // Prepare transaction output
         self.output(evm, exec_result)
+    }
+
+    /// Calculates the final gas refund amount, including any EIP-7702 refunds (Which would be zero in this case).
+    #[inline]
+    fn refund(
+        &self,
+        riscv_evm: &mut Self::RiscvEVM,
+        exec_result: &mut <Self::Frame as Frame>::FrameResult,
+        eip7702_refund: i64,
+    ) {
+        let spec = riscv_evm.ctx().cfg().spec().into();
+        post_execution::refund(spec, exec_result.gas_mut(), eip7702_refund)
+    }
+
+    /// Validates that the minimum gas floor requirements are satisfied.
+    ///
+    /// Ensures that at least the floor gas amount has been consumed during execution.
+    #[inline]
+    fn eip7623_check_gas_floor(
+        &self,
+        _riscv_evm: &mut Self::RiscvEVM,
+        exec_result: &mut <Self::Frame as Frame>::FrameResult,
+        init_and_floor_gas: InitialAndFloorGas,
+    ) {
+        post_execution::eip7623_check_gas_floor(exec_result.gas_mut(), init_and_floor_gas)
+    }
+
+    /// Returns unused gas costs to the transaction sender's account.
+    #[inline]
+    fn reimburse_caller(
+        &self,
+        riscv_evm: &mut Self::RiscvEVM,
+        exec_result: &mut <Self::Frame as Frame>::FrameResult,
+    ) -> Result<(), Self::Error> {
+        post_execution::reimburse_caller(riscv_evm.ctx(), exec_result.gas_mut()).map_err(From::from)
+    }
+
+    /// Transfers transaction fees to the block beneficiary's account.
+    #[inline]
+    fn reward_beneficiary(
+        &self,
+        riscv_evm: &mut Self::RiscvEVM,
+        exec_result: &mut <Self::Frame as Frame>::FrameResult,
+    ) -> Result<(), Self::Error> {
+        post_execution::reward_beneficiary(riscv_evm.ctx(), exec_result.gas_mut())
+            .map_err(From::from)
+    }
+
+    /// Processes the final execution output.
+    ///
+    /// This method, retrieves the final state from the journal, converts internal results to the external output format.
+    /// Internal state is cleared and EVM is prepared for the next transaction.
+    #[inline]
+    fn output(
+        &self,
+        riscv_evm: &mut Self::RiscvEVM,
+        result: <Self::Frame as Frame>::FrameResult,
+    ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
+        match core::mem::replace(riscv_evm.ctx().error(), Ok(())) {
+            Err(ContextError::Db(e)) => return Err(e.into()),
+            Err(ContextError::Custom(e)) => return Err(Self::Error::from_string(e)),
+            Ok(_) => (),
+        }
+
+        let output = post_execution::output(riscv_evm.ctx(), result);
+
+        // Clear journal
+        riscv_evm.ctx().journal().clear();
+        Ok(output)
     }
 
     #[inline]
