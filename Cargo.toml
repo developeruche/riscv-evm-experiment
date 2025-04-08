@@ -27,3 +27,7 @@ alloy-sol-types = { version = "0.8.2", default-features = false }
 
 #workspace crates
 primitives = { path = "crates/primitives"}
+handler = { path = "crates/handler"}
+
+#misc 
+auto_impl = "1.2.0"

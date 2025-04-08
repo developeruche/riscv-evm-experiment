@@ -513,6 +513,7 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "criterion",
+ "handler",
  "revm",
 ]
 
@@ -1496,6 +1497,10 @@ dependencies = [
 [[package]]
 name = "primitives"
 version = "0.1.0"
+dependencies = [
+ "auto_impl",
+ "revm",
+]
 
 [[package]]
 name = "proc-macro-crate"
