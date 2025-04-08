@@ -9,8 +9,11 @@ use revm::{
         },
     },
     context_interface::context::ContextError,
-    handler::{Frame, FrameResult, post_execution, validation},
-    interpreter::{FrameInput, InitialAndFloorGas},
+    handler::{
+        Frame, FrameInitOrResult, FrameOrResult, FrameResult, ItemOrResult, post_execution,
+        validation,
+    },
+    interpreter::{FrameInput, Gas, InitialAndFloorGas},
 };
 
 use crate::{execution, pre_execution};
@@ -164,6 +167,121 @@ pub trait Handler<CTX: ContextTr> {
             ctx.cfg().spec().into(),
             gas_limit,
         ))
+    }
+
+    /// Initializes the first frame from the provided frame input.
+    #[inline]
+    fn first_frame_init(
+        &mut self,
+        riscv_evm: &mut Self::RiscvEVM,
+        frame_input: <Self::Frame as Frame>::FrameInit,
+    ) -> Result<FrameOrResult<Self::Frame>, Self::Error> {
+        Self::Frame::init_first(riscv_evm, frame_input)
+    }
+
+    /// Executes the main frame processing loop.
+    ///
+    /// This loop manages the frame stack, processing each frame until execution completes.
+    /// For each iteration:
+    /// 1. Calls the current frame
+    /// 2. Handles the returned frame input or result
+    /// 3. Creates new frames or propagates results as needed
+    #[inline]
+    fn run_exec_loop(
+        &mut self,
+        evm: &mut Self::RiscvEVM,
+        frame: Self::Frame,
+    ) -> Result<FrameResult, Self::Error> {
+        let mut frame_stack: Vec<Self::Frame> = vec![frame];
+        loop {
+            let frame = frame_stack.last_mut().unwrap();
+            let call_or_result = self.frame_call(frame, evm)?;
+
+            let result = match call_or_result {
+                ItemOrResult::Item(init) => {
+                    match self.frame_init(frame, evm, init)? {
+                        ItemOrResult::Item(new_frame) => {
+                            frame_stack.push(new_frame);
+                            continue;
+                        }
+                        // Do not pop the frame since no new frame was created
+                        ItemOrResult::Result(result) => result,
+                    }
+                }
+                ItemOrResult::Result(result) => {
+                    // Remove the frame that returned the result
+                    frame_stack.pop();
+                    result
+                }
+            };
+
+            let Some(frame) = frame_stack.last_mut() else {
+                return Ok(result);
+            };
+            self.frame_return_result(frame, evm, result)?;
+        }
+    }
+
+    /// Executes a frame and returns either input for a new frame or the frame's result.
+    ///
+    /// When a result is returned, the frame is removed from the call stack. When frame input
+    /// is returned, a new frame is created and pushed onto the call stack.
+    #[inline]
+    fn frame_call(
+        &mut self,
+        frame: &mut Self::Frame,
+        riscv_evm: &mut Self::RiscvEVM,
+    ) -> Result<FrameInitOrResult<Self::Frame>, Self::Error> {
+        Frame::run(frame, riscv_evm)
+    }
+
+    /// Initializes a new frame from the provided frame input and previous frame.
+    ///
+    /// The previous frame contains shared memory that is passed to the new frame.
+    #[inline]
+    fn frame_init(
+        &mut self,
+        frame: &Self::Frame,
+        evm: &mut Self::RiscvEVM,
+        frame_input: <Self::Frame as Frame>::FrameInit,
+    ) -> Result<FrameOrResult<Self::Frame>, Self::Error> {
+        Frame::init(frame, evm, frame_input)
+    }
+
+    /// Processes a frame's result by inserting it into the parent frame.
+    #[inline]
+    fn frame_return_result(
+        &mut self,
+        frame: &mut Self::Frame,
+        riscv_evm: &mut Self::RiscvEVM,
+        result: <Self::Frame as Frame>::FrameResult,
+    ) -> Result<(), Self::Error> {
+        Self::Frame::return_result(frame, riscv_evm, result)
+    }
+
+    /// Processes the result of the initial call and handles returned gas.
+    #[inline]
+    fn last_frame_result(
+        &self,
+        riscv_evm: &mut Self::RiscvEVM,
+        frame_result: &mut <Self::Frame as Frame>::FrameResult,
+    ) -> Result<(), Self::Error> {
+        let instruction_result = frame_result.interpreter_result().result;
+        let gas = frame_result.gas_mut();
+        let remaining = gas.remaining();
+        let refunded = gas.refunded();
+
+        // Spend the gas limit. Gas is reimbursed when the tx returns successfully.
+        *gas = Gas::new_spent(riscv_evm.ctx().tx().gas_limit());
+
+        if instruction_result.is_ok_or_revert() {
+            gas.erase_cost(remaining);
+        }
+
+        if instruction_result.is_ok() {
+            gas.record_refund(refunded);
+        }
+        Ok(())
     }
 
     //=========================
