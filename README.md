@@ -20,10 +20,17 @@ Our primary objectives include:
 
 ## Technical Approach
 Our technical approach involves several key steps:
+### Phase One: Designing a custom RISC-V EVM architecture.
 1. Designing a custom RISC-V EVM architecture.
-2. Implementing the EVM bytecode interpreter using RISC-V instructions.
-3. Optimizing the EVM for performance and security.
-4. Testing and benchmarking the implementation.
+2. Implement RISCVIM32 assebler.
+3. Implementing the EVM bytecode interpreter using RISC-V instructions.
+4. Optimizing the EVM for performance and security.
+5. Testing and benchmarking the implementation.
+
+### Phase Two: Adapting Custom RISC-V EVM API to REVM API.
+1. Implement custom RISC-V EVM using the REVM components
+2. Testing and benchmarking the implementation.
+3. Compile result for benchmark against the two implementations (custom RISC-V EVM and REVM)
 
 ## Contributing
 We welcome contributions from the community. To contribute, please follow these steps:

@@ -1,0 +1,11 @@
+[package]
+name = "riscv_evm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+riscv_evm_core.workspace = true
+hashbrown.workspace = true
+anyhow.workspace = true
+
+elf = "0.7.4"

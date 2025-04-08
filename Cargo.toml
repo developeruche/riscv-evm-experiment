@@ -1,5 +1,5 @@
 [workspace]
-members = [ "bins/e2e-tests","crates/research-draft/benchmarks", "crates/research-draft/handler", "crates/research-draft/primitives"]
+members = [ "bins/e2e-tests", "crates/research-draft/riscv_evm", "crates/research-draft/riscv_evm_core","crates/research-final/benchmarks", "crates/research-final/handler", "crates/research-final/primitives"]
 
 
 
@@ -26,8 +26,10 @@ anyhow = "1.0.97"
 alloy-sol-types = { version = "0.8.2", default-features = false }
 
 #workspace crates
-primitives = { path = "crates/research-draft/primitives"}
-handler = { path = "crates/research-draft/handler"}
+primitives = { path = "crates/research-final/primitives"}
+handler = { path = "crates/research-final/handler"}
+riscv_evm_core = { path = "crates/research-draft/riscv_evm_core"}
 
 #misc 
 auto_impl = "1.2.0"
+hashbrown = "0.14.5"
