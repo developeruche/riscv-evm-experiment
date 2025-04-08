@@ -49,7 +49,7 @@ pub trait ExecuteCommitEvm: ExecuteEvm {
     }
 }
 
-impl<CTX> ExecuteEvm for RiscvEVM<CTX>
+impl<CTX, P> ExecuteEvm for RiscvEVM<CTX, P>
 where
     CTX: ContextTr<Journal: JournalTr<FinalOutput = JournalOutput>> + ContextSetters,
 {
@@ -77,7 +77,7 @@ where
     }
 }
 
-impl<CTX> ExecuteCommitEvm for RiscvEVM<CTX>
+impl<CTX, P> ExecuteCommitEvm for RiscvEVM<CTX, P>
 where
     CTX: ContextTr<Journal: JournalTr<FinalOutput = JournalOutput>, Db: DatabaseCommit>
         + ContextSetters,
