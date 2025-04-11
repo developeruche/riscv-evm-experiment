@@ -204,7 +204,7 @@ impl InstructionDecoder {
                     opcode,
                 });
             }
-            IMMEDIATE_CLASS | IMMEDIATE_LOAD_CLASS | JALR_CLASS => {
+            IMMEDIATE_CLASS | IMMEDIATE_LOAD_CLASS | JALR_CLASS | ENVIRONMENT_CLASS => {
                 let decoded_instruction = DecodedInstruction::IType(IType::new(*instruction));
                 return Ok(Self {
                     decoded_instruction,
@@ -238,8 +238,7 @@ impl InstructionDecoder {
                     decoded_instruction,
                     opcode,
                 });
-            }
-            ENVIRONMENT_CLASS => Err(VMErrors::EnvironmentError),
+            } 
             _ => Err(VMErrors::InvalidOpcode(opcode)),
         }
     }

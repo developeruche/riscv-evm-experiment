@@ -66,10 +66,18 @@ impl Vm {
         })
     }
     
-    // /// Creates new from binary data.
-    // pub fn from_bin_data(data: Vec<u32>) -> Result<Self, anyhow::Error> {
-        
-    // }
+    pub fn from_bin(instructions: Vec<u32>) -> Result<Self, anyhow::Error> {
+        Ok(Self {
+            registers: Registers::new(),
+            memory: Memory::new_with_load_program(
+                &instructions,
+                0,
+            ),
+            pc: 0,
+            running: false,
+            exit_code: 0,
+        })
+    }
 
     /// Step the Vm.
     /// This function will execute the instruction at the current program counter.
@@ -511,7 +519,11 @@ impl Vm {
                             _ => return Err(VMErrors::InvalidFunct3(itype.funct3)),
                         }
                     }
-                    // not handling enviroment calls because it is halted during encoding
+                    0b1110011 => {
+                        println!("Running an Ecall here");
+                        self.running = false;
+                        Ok(true)
+                    }
                     _ => return Err(VMErrors::InvalidOpcode(decoded_instruction.opcode)),
                 }
             }
@@ -665,6 +677,8 @@ impl Vm {
                     0b1101111 => {
                         // Funct3 for jal
                         self.pc += 4;
+                        self.registers
+                            .write_reg(jtype.rd as u32, self.pc);
                         self.pc += jtype.imm as u32;
                         Ok(true)
                     }
@@ -694,5 +708,18 @@ impl Vm {
                 }
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::Vm;
+
+    #[test]
+    fn test_vm_run() {
+        let code: Vec<u32> = vec![4278255891, 1123875, 5244179, 10487187, 11863139, 11863475, 16777455, 12656771, 16843027, 115, 1410451, 32871];
+        let mut vm = Vm::from_bin(code).unwrap();
+        vm.run(true)
     }
 }
