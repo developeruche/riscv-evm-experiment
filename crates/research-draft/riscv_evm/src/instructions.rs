@@ -238,7 +238,7 @@ impl InstructionDecoder {
                     decoded_instruction,
                     opcode,
                 });
-            } 
+            }
             _ => Err(VMErrors::InvalidOpcode(opcode)),
         }
     }

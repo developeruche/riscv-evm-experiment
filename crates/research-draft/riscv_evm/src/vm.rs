@@ -1,10 +1,14 @@
 //! This mod holds all the necessary structs and functions to emulate a RISC-V CPU.
 use crate::{
+    context::Context,
+    ecall_manager::process_ecall,
+    elf_parser::Elf,
     instructions::InstructionDecoder,
     utils::{process_load_to_reg, process_store_to_memory},
-    elf_parser::Elf
 };
-use riscv_evm_core::{interfaces::MemoryInterface, sign_extend_u32, Memory, MemoryChuckSize, Registers};
+use riscv_evm_core::{
+    Memory, MemoryChuckSize, Registers, interfaces::MemoryInterface, sign_extend_u32,
+};
 use std::{
     fs::File,
     io::{BufReader, Read},
@@ -21,6 +25,7 @@ pub enum VMErrors {
     MemoryStoreError,
     InvalidFunct7(u32),
     InvalidFunct3(u32),
+    EnvirmentCallErrorWithDetail(String),
 }
 
 #[derive(Debug, Clone)]
@@ -65,14 +70,11 @@ impl Vm {
             exit_code: 0,
         })
     }
-    
+
     pub fn from_bin(instructions: Vec<u32>) -> Result<Self, anyhow::Error> {
         Ok(Self {
             registers: Registers::new(),
-            memory: Memory::new_with_load_program(
-                &instructions,
-                0,
-            ),
+            memory: Memory::new_with_load_program(&instructions, 0),
             pc: 0,
             running: false,
             exit_code: 0,
@@ -85,7 +87,7 @@ impl Vm {
     /// If the instruction is a jump, the program counter will be updated accordingly.
     /// If the instruction is a syscall, the program will be halted.
     /// If the instruction is a halt, the program will be halted.
-    pub fn step(&mut self, debug_mode: bool) -> Result<bool, VMErrors> {
+    pub fn step(&mut self, debug_mode: bool, context: &mut Context) -> Result<bool, VMErrors> {
         // Fetch the instruction from memory
         let instruction = self
             .memory
@@ -399,7 +401,7 @@ impl Vm {
                                         Ok(true)
                                     }
                                     _ => {
-                                        return Err(VMErrors::InvalidFunct7(itype.metadata.funct7))
+                                        return Err(VMErrors::InvalidFunct7(itype.metadata.funct7));
                                     }
                                 }
                             }
@@ -520,7 +522,7 @@ impl Vm {
                         }
                     }
                     0b1110011 => {
-                        println!("Running an Ecall here");
+                        process_ecall(self, context)?;
                         self.running = false;
                         Ok(true)
                     }
@@ -677,8 +679,7 @@ impl Vm {
                     0b1101111 => {
                         // Funct3 for jal
                         self.pc += 4;
-                        self.registers
-                            .write_reg(jtype.rd as u32, self.pc);
+                        self.registers.write_reg(jtype.rd as u32, self.pc);
                         self.pc += jtype.imm as u32;
                         Ok(true)
                     }
@@ -691,10 +692,10 @@ impl Vm {
     /// Run the Vm.
     /// This function will run the Vm until it halts.
     /// The Vm will halt if the program counter is out of bounds or if the instruction is a halt.
-    pub fn run(&mut self, debug_mode: bool) {
+    pub fn run(&mut self, debug_mode: bool, context: &mut Context) {
         self.running = true;
         while self.running {
-            match self.step(debug_mode) {
+            match self.step(debug_mode, context) {
                 Ok(true) => continue,
                 Ok(false) => break,
                 Err(e) => {
@@ -711,15 +712,20 @@ impl Vm {
     }
 }
 
-
 #[cfg(test)]
 mod test {
+    use crate::context::Context;
+
     use super::Vm;
 
     #[test]
     fn test_vm_run() {
-        let code: Vec<u32> = vec![4278255891, 1123875, 5244179, 10487187, 11863139, 11863475, 16777455, 12656771, 16843027, 115, 1410451, 32871];
+        let code: Vec<u32> = vec![
+            4278255891, 1123875, 5244179, 10487187, 11863139, 11863475, 16777455, 12656771,
+            16843027, 115, 1410451, 32871,
+        ];
+        let mut context = Context::default();
         let mut vm = Vm::from_bin(code).unwrap();
-        vm.run(true)
+        vm.run(true, &mut context);
     }
 }

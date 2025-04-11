@@ -1,5 +1,5 @@
 use interfaces::MemoryInterface;
-
+pub mod e_constants;
 pub mod interfaces;
 
 /// This is the size of a word in bytes for this vm

@@ -4,14 +4,14 @@
 //! this code was copied from SP1 codebase's implementation of the ELF parser.
 //! see: [code](https://github.com/succinctlabs/sp1/blob/dev/crates/core/executor/src/disassembler/elf.rs)
 
-use riscv_evm_core::{MAXIMUM_MEMORY_SIZE, WORD_SIZE};
 use elf::{
+    ElfBytes,
     abi::{EM_RISCV, ET_EXEC, PF_X, PT_LOAD},
     endian::LittleEndian,
     file::Class,
-    ElfBytes,
 };
 use hashbrown::HashMap;
+use riscv_evm_core::{MAXIMUM_MEMORY_SIZE, WORD_SIZE};
 use std::cmp::min;
 
 /// RISC-V 32IM ELF (Executable and Linkable Format) File.

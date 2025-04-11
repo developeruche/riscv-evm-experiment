@@ -1,5 +1,5 @@
 use crate::vm::{VMErrors, Vm};
-use riscv_evm_core::{interfaces::MemoryInterface, MemoryChuckSize};
+use riscv_evm_core::{MemoryChuckSize, interfaces::MemoryInterface};
 
 pub fn process_load_to_reg(
     vm: &mut Vm,
