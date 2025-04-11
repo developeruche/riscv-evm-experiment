@@ -1,2 +1,131 @@
-pub const CREATE_E_CALL: usize = 0;
-pub const CREATE2_E_CALL: usize = 1;
+pub enum RiscvEVMECalls {
+    /// [offset, size] -> hash
+    Keccak256,
+    /// Address of the current excecuting contract |-> address
+    Address,
+    /// Native balance of the current caller [address] -> balance
+    Balance,
+    /// Address of the transaction origin |-> address
+    Origin,
+    /// Address of the current calling address |-> address
+    Caller,
+    /// Deposit value for this Tx |-> value
+    CallValue,
+    /// Load a Word(256bits in this case) from the calldata to the stack
+    /// [i] -> data[i]
+    CallDataLoad,
+    /// Returns  the size of the calldata |-> usize
+    CallDataSize,
+    /// Copy calldata from input to memory [destOffset, offset, size]
+    CallDataCopy,
+    /// Returns the size of the code |-> usize
+    CodeSize,
+    /// Copy code from input to memory [destOffset, offset, size]
+    CodeCopy,
+    /// Gas price now
+    GasPrice,
+    /// Get the size of an External account's code [address] -> usize
+    ExtCodeSize,
+    /// Get the code of an External account's code [address, destOffset, offset, size]
+    ExtCodeCopy,
+    /// Get size of output data from the previous call from the current environment
+    ReturnDataSize,
+    /// Copy output data from the previous call to memory [destOffset, offset, size]
+    ReturnDataCopy,
+    /// Get hash of an account's code [address] -> hash
+    ExtCodeHash,
+    /// Get the hash of one of the 256 most recent complete blocks [blockNumber] -> hash
+    BlockHash,
+    /// Get the block's beneficiary address |-> address
+    Coinbase,
+    /// Get the block's timestamp |-> timestamp
+    Timestamp,
+    /// Get the block's number |-> blockNumber
+    Number,
+    /// Get the block's difficulty |-> difficulty
+    PrevRandao,
+    /// Get the block's gas limit |-> gasLimit
+    GasLimit,
+    /// Get the chain ID |-> chainId
+    ChainId,
+    /// Get balance of currently executing account |-> balance
+    SelfBalance,
+    /// Get the base fee |-> baseFee
+    BaseFee,
+    /// Get versioned hashes [index] -> blobVersionedHashesAtIndex
+    BlobHash,
+    /// Returns the value of the blob base-fee of the current block |-> blobBaseFee
+    BlobBaseFee,
+    /// Amount of valiable gas
+    Gas,
+    /// Append log record with no topics [offset, size]
+    Log0,
+    /// Append log record with one topic [offset, size, topic]
+    Log1,
+    /// Append log record with two topics [offset, size, topic1, topic2]
+    Log2,
+    /// Append log record with three topics [offset, size, topic1, topic2, topic3]
+    Log3,
+    /// Append log record with four topics [offset, size, topic1, topic2, topic3, topic4]
+    Log4,
+    /// Create a new account with associated code [value, offset, size] -> address
+    Create,
+    /// Message-call into an account [gas, address, value, argsOffset, argsSize, retOffset, retSize] -> success
+    Call,
+    /// Message-call into this account with alternative account's code [gas, address, value, argsOffset, argsSize, retOffset, retSize] -> success
+    CallCode,
+    /// Halt execution returning output data [offset, size]
+    Return,
+    /// Message-call into this account with an alternative account's code, but persisting the current values for sender and value [gas, address, argsOffset, argsSize, retOffset, retSize] -> success
+    DelegateCall,
+    /// Create a new account with associated code at a predictable address [value, offset, size, salt] -> address
+    Create2,
+}
+
+impl RiscvEVMECalls {
+    pub fn from_u8(ecode: u8) -> Option<Self> {
+        match ecode {
+            0x20 => Some(Self::Keccak256),
+            0x30 => Some(Self::Address),
+            0x31 => Some(Self::Balance),
+            0x32 => Some(Self::Origin),
+            0x33 => Some(Self::Caller),
+            0x34 => Some(Self::CallValue),
+            0x35 => Some(Self::CallDataLoad),
+            0x36 => Some(Self::CallDataSize),
+            0x37 => Some(Self::CallDataCopy),
+            0x38 => Some(Self::CodeSize),
+            0x39 => Some(Self::CodeCopy),
+            0x3A => Some(Self::GasPrice),
+            0x3B => Some(Self::ExtCodeSize),
+            0x3C => Some(Self::ExtCodeCopy),
+            0x3D => Some(Self::ReturnDataSize),
+            0x3E => Some(Self::ReturnDataCopy),
+            0x3F => Some(Self::ExtCodeHash),
+            0x40 => Some(Self::BlockHash),
+            0x41 => Some(Self::Coinbase),
+            0x42 => Some(Self::Timestamp),
+            0x43 => Some(Self::Number),
+            0x44 => Some(Self::PrevRandao),
+            0x45 => Some(Self::GasLimit),
+            0x46 => Some(Self::ChainId),
+            0x47 => Some(Self::SelfBalance),
+            0x48 => Some(Self::BaseFee),
+            0x49 => Some(Self::BlobHash),
+            0x4A => Some(Self::BlobBaseFee),
+            0x5A => Some(Self::Gas),
+            0xA0 => Some(Self::Log0),
+            0xA1 => Some(Self::Log1),
+            0xA2 => Some(Self::Log2),
+            0xA3 => Some(Self::Log3),
+            0xA4 => Some(Self::Log4),
+            0xF0 => Some(Self::Create),
+            0xF1 => Some(Self::Call),
+            0xF2 => Some(Self::CallCode),
+            0xF3 => Some(Self::Return),
+            0xF4 => Some(Self::DelegateCall),
+            0xF5 => Some(Self::Create2),
+            _ => None,
+        }
+    }
+}
