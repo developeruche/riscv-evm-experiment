@@ -33,3 +33,4 @@ riscv_evm_core = { path = "crates/research-draft/riscv_evm_core"}
 #misc 
 auto_impl = "1.2.0"
 hashbrown = "0.14.5"
+hex = "0.4.3"

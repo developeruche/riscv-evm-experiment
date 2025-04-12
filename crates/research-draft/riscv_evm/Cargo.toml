@@ -8,5 +8,6 @@ riscv_evm_core.workspace = true
 hashbrown.workspace = true
 anyhow.workspace = true
 revm.workspace = true
+hex.workspace = true
 
 elf = "0.7.4"

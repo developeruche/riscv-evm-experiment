@@ -119,6 +119,56 @@ pub fn u32_vec_to_address(u32_values: &[u32]) -> [u8; 20] {
     result
 }
 
+/// Converts a vector of bytes into a vector of u32 values (big-endian format)
+/// Pads with zeros if necessary to complete the last u32
+pub fn bytes_to_u32_vec(bytes: &[u8]) -> Vec<u32> {
+    // Calculate how many u32 values we'll need
+    let count = (bytes.len() + 3) / 4; // Ceiling division by 4
+    let mut result = Vec::with_capacity(count);
+
+    // Process each 4-byte chunk
+    for chunk_idx in 0..count {
+        let chunk_start = chunk_idx * 4;
+        let chunk_end = std::cmp::min(chunk_start + 4, bytes.len());
+
+        // Create a 4-byte array, padded with zeros if needed
+        let mut chunk = [0u8; 4];
+        for i in chunk_start..chunk_end {
+            chunk[i - chunk_start] = bytes[i];
+        }
+
+        // Convert to u32 using big-endian format
+        let value = ((chunk[0] as u32) << 24)
+            | ((chunk[1] as u32) << 16)
+            | ((chunk[2] as u32) << 8)
+            | (chunk[3] as u32);
+
+        result.push(value);
+    }
+
+    result
+}
+
+/// Converts a vector of u32 values back to a vector of bytes (big-endian format)
+/// Returns exactly `byte_len` bytes, truncating if the u32 vector would produce more
+pub fn u32_vec_to_bytes(u32_values: &[u32], byte_len: usize) -> Vec<u8> {
+    let mut result = Vec::with_capacity(u32_values.len() * 4);
+
+    // Process each u32 value
+    for &value in u32_values {
+        // Extract bytes in big-endian order
+        result.push(((value >> 24) & 0xFF) as u8);
+        result.push(((value >> 16) & 0xFF) as u8);
+        result.push(((value >> 8) & 0xFF) as u8);
+        result.push((value & 0xFF) as u8);
+    }
+
+    // Truncate to requested length (in case we generated too many bytes)
+    result.truncate(byte_len);
+
+    result
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -195,5 +245,118 @@ mod test {
         let bytes = original.to_be_bytes();
         let result = bytes_to_u32(&bytes);
         assert_eq!(result, original);
+    }
+
+    #[test]
+    fn test_bytes_to_u32_vec_exact_multiple() {
+        // Test with exactly 8 bytes (2 u32s)
+        let bytes = vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0];
+        let result = bytes_to_u32_vec(&bytes);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], 0x12345678);
+        assert_eq!(result[1], 0x9ABCDEF0);
+    }
+
+    #[test]
+    fn test_bytes_to_u32_vec_partial() {
+        // Test with 6 bytes (not a multiple of 4)
+        let bytes = vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC];
+        let result = bytes_to_u32_vec(&bytes);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], 0x12345678);
+        assert_eq!(result[1], 0x9ABC0000); // Last 2 bytes should be zero-padded
+    }
+
+    #[test]
+    fn test_bytes_to_u32_vec_empty() {
+        // Test with empty input
+        let bytes: Vec<u8> = vec![];
+        let result = bytes_to_u32_vec(&bytes);
+
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_bytes_to_u32_vec_single_byte() {
+        // Test with a single byte
+        let bytes = vec![0xFF];
+        let result = bytes_to_u32_vec(&bytes);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], 0xFF000000);
+    }
+
+    #[test]
+    fn test_u32_vec_to_bytes_exact_multiple() {
+        // Test with 2 u32s to make 8 bytes
+        let u32_values = vec![0x12345678, 0x9ABCDEF0];
+        let result = u32_vec_to_bytes(&u32_values, 8);
+
+        assert_eq!(result.len(), 8);
+        assert_eq!(result, vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]);
+    }
+
+    #[test]
+    fn test_u32_vec_to_bytes_truncate() {
+        // Test with 2 u32s but only want 6 bytes
+        let u32_values = vec![0x12345678, 0x9ABCDEF0];
+        let result = u32_vec_to_bytes(&u32_values, 6);
+
+        assert_eq!(result.len(), 6);
+        assert_eq!(result, vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC]);
+    }
+
+    #[test]
+    fn test_u32_vec_to_bytes_empty() {
+        // Test with empty input
+        let u32_values: Vec<u32> = vec![];
+        let result = u32_vec_to_bytes(&u32_values, 0);
+
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_u32_vec_to_bytes_larger_size() {
+        // Test requesting more bytes than the u32 vector can provide
+        // It should still only return the number of bytes the u32 vector can provide
+        let u32_values = vec![0x12345678];
+        let result = u32_vec_to_bytes(&u32_values, 10);
+
+        assert_eq!(result.len(), 4); // Should only return 4 bytes
+        assert_eq!(result, vec![0x12, 0x34, 0x56, 0x78]);
+    }
+
+    #[test]
+    fn test_round_trip_exact() {
+        // Test round trip conversion with exact multiple of 4
+        let original = vec![0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+        let u32_values = bytes_to_u32_vec(&original);
+        let result = u32_vec_to_bytes(&u32_values, original.len());
+
+        assert_eq!(result, original);
+    }
+
+    #[test]
+    fn test_round_trip_partial() {
+        // Test round trip conversion with non-multiple of 4
+        let original = vec![0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
+        let u32_values = bytes_to_u32_vec(&original);
+        let result = u32_vec_to_bytes(&u32_values, original.len());
+
+        assert_eq!(result, original);
+    }
+
+    #[test]
+    fn test_real_world_example() {
+        // A realistic test case with EVM calldata
+        let calldata = hex::decode("a9059cbb000000000000000000000000b97048628db6b661d4c2aa833e95dbe1a905b2800000000000000000000000000000000000000000000000000000000000003e84").unwrap();
+
+        // Convert to u32s and back
+        let u32_values = bytes_to_u32_vec(&calldata);
+        let result = u32_vec_to_bytes(&u32_values, calldata.len());
+
+        assert_eq!(result, calldata);
     }
 }

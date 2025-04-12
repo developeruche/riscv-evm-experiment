@@ -1,31 +1,13 @@
 use crate::{
     context::Context,
-    utils::{bytes_to_u32, u32_vec_to_address},
+    utils::{bytes_to_u32, bytes_to_u32_vec, u32_vec_to_address},
     vm::{VMErrors, Vm},
 };
 use revm::{
     interpreter::Host,
     primitives::{Address, keccak256},
 };
-use riscv_evm_core::{
-    MemoryChuckSize,
-    e_constants::{
-        ADDRESS_REGISTER_1, ADDRESS_REGISTER_2, ADDRESS_REGISTER_3, ADDRESS_REGISTER_4,
-        ADDRESS_REGISTER_5, BALANCE_INPUT_REGISTER_1, BALANCE_INPUT_REGISTER_2,
-        BALANCE_INPUT_REGISTER_3, BALANCE_INPUT_REGISTER_4, BALANCE_INPUT_REGISTER_5,
-        BALANCE_OUTPUT_REGISTER_1, BALANCE_OUTPUT_REGISTER_2, BALANCE_OUTPUT_REGISTER_3,
-        BALANCE_OUTPUT_REGISTER_4, BALANCE_OUTPUT_REGISTER_5, BALANCE_OUTPUT_REGISTER_6,
-        BALANCE_OUTPUT_REGISTER_7, BALANCE_OUTPUT_REGISTER_8, CALLER_OUTPUT_REGISTER_1,
-        CALLER_OUTPUT_REGISTER_2, CALLER_OUTPUT_REGISTER_3, CALLER_OUTPUT_REGISTER_4,
-        CALLER_OUTPUT_REGISTER_5, ECALL_CODE_REG, KECCAK256_OFFSET_REGISTER,
-        KECCAK256_OUTPUT_REGITER_1, KECCAK256_OUTPUT_REGITER_2, KECCAK256_OUTPUT_REGITER_3,
-        KECCAK256_OUTPUT_REGITER_4, KECCAK256_OUTPUT_REGITER_5, KECCAK256_OUTPUT_REGITER_6,
-        KECCAK256_OUTPUT_REGITER_7, KECCAK256_OUTPUT_REGITER_8, KECCAK256_SIZE_REGISTER,
-        ORIGIN_OUTPUT_REGISTER_1, ORIGIN_OUTPUT_REGISTER_2, ORIGIN_OUTPUT_REGISTER_3,
-        ORIGIN_OUTPUT_REGISTER_4, ORIGIN_OUTPUT_REGISTER_5, RiscvEVMECalls,
-    },
-    interfaces::MemoryInterface,
-};
+use riscv_evm_core::{MemoryChuckSize, e_constants::*, interfaces::MemoryInterface};
 
 pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors> {
     let e_call_code = vm.registers.read_reg(ECALL_CODE_REG);
@@ -163,10 +145,98 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 Ok(())
             }
-            RiscvEVMECalls::CallValue => todo!(),
-            RiscvEVMECalls::CallDataLoad => todo!(),
-            RiscvEVMECalls::CallDataSize => todo!(),
-            RiscvEVMECalls::CallDataCopy => todo!(),
+            RiscvEVMECalls::CallValue => {
+                // Load the vaule from context into a 8 registers
+                let value: [u8; 32] = context.eth_context.tx.value.to_be_bytes();
+
+                // writing 256 bits to 8 regiters
+                vm.registers
+                    .write_reg(CALL_VALUE_OUTPUT_REGISTER_1, bytes_to_u32(&value[0..4]));
+                vm.registers
+                    .write_reg(CALL_VALUE_OUTPUT_REGISTER_2, bytes_to_u32(&value[4..8]));
+                vm.registers
+                    .write_reg(CALL_VALUE_OUTPUT_REGISTER_3, bytes_to_u32(&value[8..12]));
+                vm.registers
+                    .write_reg(CALL_VALUE_OUTPUT_REGISTER_4, bytes_to_u32(&value[12..16]));
+                vm.registers
+                    .write_reg(CALL_VALUE_OUTPUT_REGISTER_5, bytes_to_u32(&value[16..20]));
+                vm.registers
+                    .write_reg(CALL_VALUE_OUTPUT_REGISTER_6, bytes_to_u32(&value[20..24]));
+                vm.registers
+                    .write_reg(CALL_VALUE_OUTPUT_REGISTER_7, bytes_to_u32(&value[24..28]));
+                vm.registers
+                    .write_reg(CALL_VALUE_OUTPUT_REGISTER_8, bytes_to_u32(&value[28..32]));
+
+                Ok(())
+            }
+            RiscvEVMECalls::CallDataLoad => {
+                // This would load 32bytes of the call data to 8 registers
+                // The offset this 32bytes should come from is gotten from a register.
+                let offset = vm.registers.read_reg(CALL_DATA_LOAD_INPUT_REGISTER);
+                let mut data = Vec::new();
+                for i in offset as usize..(offset + 32) as usize {
+                    data.push(*context.eth_context.tx.data.get(i).unwrap_or(&0u8));
+                }
+                // writing 256 bits to 8 regiters
+                vm.registers
+                    .write_reg(CALL_DATA_LOAD_OUTPUT_REGISTER_1, bytes_to_u32(&data[0..4]));
+                vm.registers
+                    .write_reg(CALL_DATA_LOAD_OUTPUT_REGISTER_2, bytes_to_u32(&data[4..8]));
+                vm.registers
+                    .write_reg(CALL_DATA_LOAD_OUTPUT_REGISTER_3, bytes_to_u32(&data[8..12]));
+                vm.registers.write_reg(
+                    CALL_DATA_LOAD_OUTPUT_REGISTER_4,
+                    bytes_to_u32(&data[12..16]),
+                );
+                vm.registers.write_reg(
+                    CALL_DATA_LOAD_OUTPUT_REGISTER_5,
+                    bytes_to_u32(&data[16..20]),
+                );
+                vm.registers.write_reg(
+                    CALL_DATA_LOAD_OUTPUT_REGISTER_6,
+                    bytes_to_u32(&data[20..24]),
+                );
+                vm.registers.write_reg(
+                    CALL_DATA_LOAD_OUTPUT_REGISTER_7,
+                    bytes_to_u32(&data[24..28]),
+                );
+                vm.registers.write_reg(
+                    CALL_DATA_LOAD_OUTPUT_REGISTER_8,
+                    bytes_to_u32(&data[28..32]),
+                );
+
+                Ok(())
+            }
+            RiscvEVMECalls::CallDataSize => {
+                // This load to a register the number of bytes present in the calldata
+                // into a register
+                let size = context.eth_context.tx.data.len() as u32;
+
+                vm.registers
+                    .write_reg(CALL_DATA_LOAD_OUTPUT_REGISTER_1, size);
+
+                Ok(())
+            }
+            RiscvEVMECalls::CallDataCopy => {
+                // Loads the dest_offset, offset and size from registers
+                let dest_offset = vm.registers.read_reg(CALL_DATA_COPY_INPUT_REGISTER_1);
+                let offset = vm.registers.read_reg(CALL_DATA_COPY_INPUT_REGISTER_2);
+                let size = vm.registers.read_reg(CALL_DATA_COPY_INPUT_REGISTER_3);
+
+                let mut data = Vec::new();
+                for i in offset as usize..(offset + size) as usize {
+                    data.push(*context.eth_context.tx.data.get(i).unwrap_or(&0u8));
+                }
+
+                // writing to memory
+                for (i, byte) in data.iter().enumerate() {
+                    let byte_addr = dest_offset + i as u32;
+                    vm.memory
+                        .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
+                }
+
+                Ok(())
+            }
             RiscvEVMECalls::CodeSize => todo!(),
             RiscvEVMECalls::CodeCopy => todo!(),
             RiscvEVMECalls::GasPrice => todo!(),

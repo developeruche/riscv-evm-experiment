@@ -1916,6 +1916,7 @@ dependencies = [
  "anyhow",
  "elf",
  "hashbrown 0.14.5",
+ "hex",
  "revm",
  "riscv_evm_core",
 ]
