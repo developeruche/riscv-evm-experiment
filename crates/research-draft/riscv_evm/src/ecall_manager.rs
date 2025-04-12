@@ -4,6 +4,7 @@ use crate::{
     vm::{VMErrors, Vm},
 };
 use revm::{
+    context::ContextTr,
     interpreter::Host,
     primitives::{Address, keccak256},
 };
@@ -237,11 +238,174 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 Ok(())
             }
-            RiscvEVMECalls::CodeSize => todo!(),
-            RiscvEVMECalls::CodeCopy => todo!(),
-            RiscvEVMECalls::GasPrice => todo!(),
-            RiscvEVMECalls::ExtCodeSize => todo!(),
-            RiscvEVMECalls::ExtCodeCopy => todo!(),
+            RiscvEVMECalls::CodeSize => {
+                // This function retruns the code of the currently excecuting contract
+                let contract_accout = context
+                    .eth_context
+                    .journaled_state
+                    .account(context.address)
+                    .clone();
+                let code_len = contract_accout
+                    .info
+                    .code
+                    .unwrap_or_default()
+                    .bytecode()
+                    .len() as u32;
+
+                vm.registers.write_reg(CODE_SIZE_OUT_REGISTER, code_len);
+
+                Ok(())
+            }
+            RiscvEVMECalls::CodeCopy => {
+                // This copies the code of the current running contract to memory
+                // the dest_offest, offset and size is gotten from the register
+                // Loads the dest_offset, offset and size from registers
+                let dest_offset = vm.registers.read_reg(CODE_COPY_INPUT_REGISTER_1);
+                let offset = vm.registers.read_reg(CODE_COPY_INPUT_REGISTER_2);
+                let size = vm.registers.read_reg(CODE_COPY_INPUT_REGISTER_3);
+
+                let contract_accout = context
+                    .eth_context
+                    .journaled_state
+                    .account(context.address)
+                    .clone();
+                let code = contract_accout
+                    .info
+                    .code
+                    .unwrap_or_default()
+                    .bytecode()
+                    .0
+                    .clone()
+                    .to_vec();
+
+                let mut data = Vec::new();
+                for i in offset as usize..(offset + size) as usize {
+                    data.push(*code.get(i).unwrap_or(&0u8));
+                }
+
+                // writing to memory
+                for (i, byte) in data.iter().enumerate() {
+                    let byte_addr = dest_offset + i as u32;
+                    vm.memory
+                        .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
+                }
+
+                Ok(())
+            }
+            RiscvEVMECalls::GasPrice => {
+                // This returns the gas price in the current enviroment
+                let gas_price: [u8; 32] = context.eth_context.effective_gas_price().to_be_bytes();
+
+                // writing 256 bits to 8 regiters
+                vm.registers
+                    .write_reg(GAS_PRICE_OUTPUT_REGISTER_1, bytes_to_u32(&gas_price[0..4]));
+                vm.registers
+                    .write_reg(GAS_PRICE_OUTPUT_REGISTER_2, bytes_to_u32(&gas_price[4..8]));
+                vm.registers
+                    .write_reg(GAS_PRICE_OUTPUT_REGISTER_3, bytes_to_u32(&gas_price[8..12]));
+                vm.registers.write_reg(
+                    GAS_PRICE_OUTPUT_REGISTER_4,
+                    bytes_to_u32(&gas_price[12..16]),
+                );
+                vm.registers.write_reg(
+                    GAS_PRICE_OUTPUT_REGISTER_5,
+                    bytes_to_u32(&gas_price[16..20]),
+                );
+                vm.registers.write_reg(
+                    GAS_PRICE_OUTPUT_REGISTER_6,
+                    bytes_to_u32(&gas_price[20..24]),
+                );
+                vm.registers.write_reg(
+                    GAS_PRICE_OUTPUT_REGISTER_7,
+                    bytes_to_u32(&gas_price[24..28]),
+                );
+                vm.registers.write_reg(
+                    GAS_PRICE_OUTPUT_REGISTER_8,
+                    bytes_to_u32(&gas_price[28..32]),
+                );
+
+                Ok(())
+            }
+            RiscvEVMECalls::ExtCodeSize => {
+                // This would copy the code of a given address to memory
+                // This function retruns the code of the currently excecuting contract
+                let address_u32_1 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_1);
+                let address_u32_2 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_2);
+                let address_u32_3 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_3);
+                let address_u32_4 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_4);
+                let address_u32_5 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_5);
+
+                let address = u32_vec_to_address(&vec![
+                    address_u32_1,
+                    address_u32_2,
+                    address_u32_3,
+                    address_u32_4,
+                    address_u32_5,
+                ]);
+
+                let contract_accout = context
+                    .eth_context
+                    .journaled_state
+                    .account(Address::from(address))
+                    .clone();
+                let code_len = contract_accout
+                    .info
+                    .code
+                    .unwrap_or_default()
+                    .bytecode()
+                    .len() as u32;
+
+                vm.registers.write_reg(CODE_SIZE_OUT_REGISTER, code_len);
+
+                Ok(())
+            }
+            RiscvEVMECalls::ExtCodeCopy => {
+                let address_u32_1 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_1);
+                let address_u32_2 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_2);
+                let address_u32_3 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_3);
+                let address_u32_4 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_4);
+                let address_u32_5 = vm.registers.read_reg(EXT_CODE_SIZE_INPUT_REGISTER_5);
+
+                let dest_offset = vm.registers.read_reg(EXT_CODE_COPY_INPUT_REGISTER_6);
+                let offset = vm.registers.read_reg(EXT_CODE_COPY_INPUT_REGISTER_7);
+                let size = vm.registers.read_reg(EXT_CODE_COPY_INPUT_REGISTER_8);
+
+                let address = u32_vec_to_address(&vec![
+                    address_u32_1,
+                    address_u32_2,
+                    address_u32_3,
+                    address_u32_4,
+                    address_u32_5,
+                ]);
+
+                let contract_accout = context
+                    .eth_context
+                    .journaled_state
+                    .account(Address::from(address))
+                    .clone();
+                let code = contract_accout
+                    .info
+                    .code
+                    .unwrap_or_default()
+                    .bytecode()
+                    .0
+                    .clone()
+                    .to_vec();
+
+                let mut data = Vec::new();
+                for i in offset as usize..(offset + size) as usize {
+                    data.push(*code.get(i).unwrap_or(&0u8));
+                }
+
+                // writing to memory
+                for (i, byte) in data.iter().enumerate() {
+                    let byte_addr = dest_offset + i as u32;
+                    vm.memory
+                        .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
+                }
+
+                Ok(())
+            }
             RiscvEVMECalls::ReturnDataSize => todo!(),
             RiscvEVMECalls::ReturnDataCopy => todo!(),
             RiscvEVMECalls::ExtCodeHash => todo!(),

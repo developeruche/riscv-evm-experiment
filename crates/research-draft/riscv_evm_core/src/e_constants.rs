@@ -139,7 +139,7 @@ impl RiscvEVMECalls {
 //==========================
 // ECALL Constants
 //==========================
-pub const ECALL_CODE_REG: u32 = 1;
+pub const ECALL_CODE_REG: u32 = 31;
 
 // Keccak256
 pub const KECCAK256_OFFSET_REGISTER: u32 = 2;
@@ -220,3 +220,38 @@ pub const CALL_DATA_SIZE_OUTPUT_REGISTER: u32 = 1;
 pub const CALL_DATA_COPY_INPUT_REGISTER_1: u32 = 1;
 pub const CALL_DATA_COPY_INPUT_REGISTER_2: u32 = 2;
 pub const CALL_DATA_COPY_INPUT_REGISTER_3: u32 = 3;
+
+// CodeSize
+pub const CODE_SIZE_OUT_REGISTER: u32 = 1;
+
+// CodeCopy
+pub const CODE_COPY_INPUT_REGISTER_1: u32 = 1;
+pub const CODE_COPY_INPUT_REGISTER_2: u32 = 2;
+pub const CODE_COPY_INPUT_REGISTER_3: u32 = 3;
+
+// GasPrice
+pub const GAS_PRICE_OUTPUT_REGISTER_1: u32 = 1;
+pub const GAS_PRICE_OUTPUT_REGISTER_2: u32 = 2;
+pub const GAS_PRICE_OUTPUT_REGISTER_3: u32 = 3;
+pub const GAS_PRICE_OUTPUT_REGISTER_4: u32 = 4;
+pub const GAS_PRICE_OUTPUT_REGISTER_5: u32 = 5;
+pub const GAS_PRICE_OUTPUT_REGISTER_6: u32 = 6;
+pub const GAS_PRICE_OUTPUT_REGISTER_7: u32 = 7;
+pub const GAS_PRICE_OUTPUT_REGISTER_8: u32 = 8;
+
+//ExtCodeSize
+pub const EXT_CODE_SIZE_INPUT_REGISTER_1: u32 = 1;
+pub const EXT_CODE_SIZE_INPUT_REGISTER_2: u32 = 2;
+pub const EXT_CODE_SIZE_INPUT_REGISTER_3: u32 = 3;
+pub const EXT_CODE_SIZE_INPUT_REGISTER_4: u32 = 4;
+pub const EXT_CODE_SIZE_INPUT_REGISTER_5: u32 = 5;
+
+// ExtCodeCopy
+pub const EXT_CODE_COPY_INPUT_REGISTER_1: u32 = 1;
+pub const EXT_CODE_COPY_INPUT_REGISTER_2: u32 = 2;
+pub const EXT_CODE_COPY_INPUT_REGISTER_3: u32 = 3;
+pub const EXT_CODE_COPY_INPUT_REGISTER_4: u32 = 4;
+pub const EXT_CODE_COPY_INPUT_REGISTER_5: u32 = 5;
+pub const EXT_CODE_COPY_INPUT_REGISTER_6: u32 = 6;
+pub const EXT_CODE_COPY_INPUT_REGISTER_7: u32 = 7;
+pub const EXT_CODE_COPY_INPUT_REGISTER_8: u32 = 8;
