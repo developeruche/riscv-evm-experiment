@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use revm::{
+    Context as EthContext,
     context::transaction::{AccessList, SignedAuthorization},
     primitives::{Address, B256, Bytes, TxKind, U256},
 };
@@ -40,9 +41,21 @@ pub struct Storage {
     pub mapping: HashMap<StorageType, StorageType>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Context {
-    pub block: BlockEnv,
-    pub tx: TxEnv,
-    pub storage: Storage,
+    pub eth_context: EthContext,
+
+    // frame related cotext
+    pub address: Address,        // address(this)
+    pub current_caller: Address, // msg.sender
+}
+
+impl Context {
+    pub fn new(eth_context: EthContext) -> Self {
+        Self {
+            eth_context,
+            address: Default::default(),
+            current_caller: Default::default(),
+        }
+    }
 }

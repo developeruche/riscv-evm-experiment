@@ -80,10 +80,14 @@ pub enum RiscvEVMECalls {
     DelegateCall,
     /// Create a new account with associated code at a predictable address [value, offset, size, salt] -> address
     Create2,
+    /// Static message-call into an account [gas, address, argsOffset, argsSize, retOffset, retSize] -> success
+    StaticCall,
+    /// Halt execution reverting state changes but returning data and remaining gas [offset, size]
+    Revert,
 }
 
 impl RiscvEVMECalls {
-    pub fn from_u8(ecode: u8) -> Option<Self> {
+    pub fn from_u32(ecode: u32) -> Option<Self> {
         match ecode {
             0x20 => Some(Self::Keccak256),
             0x30 => Some(Self::Address),
@@ -125,7 +129,64 @@ impl RiscvEVMECalls {
             0xF3 => Some(Self::Return),
             0xF4 => Some(Self::DelegateCall),
             0xF5 => Some(Self::Create2),
+            0xFA => Some(Self::StaticCall),
+            0xFD => Some(Self::Revert),
             _ => None,
         }
     }
 }
+
+//==========================
+// ECALL Constants
+//==========================
+pub const ECALL_CODE_REG: u32 = 1;
+
+// Keccak256
+pub const KECCAK256_OFFSET_REGISTER: u32 = 2;
+pub const KECCAK256_SIZE_REGISTER: u32 = 3;
+
+pub const KECCAK256_OUTPUT_REGITER_1: u32 = 4;
+pub const KECCAK256_OUTPUT_REGITER_2: u32 = 4;
+pub const KECCAK256_OUTPUT_REGITER_3: u32 = 4;
+pub const KECCAK256_OUTPUT_REGITER_4: u32 = 4;
+pub const KECCAK256_OUTPUT_REGITER_5: u32 = 4;
+pub const KECCAK256_OUTPUT_REGITER_6: u32 = 4;
+pub const KECCAK256_OUTPUT_REGITER_7: u32 = 4;
+pub const KECCAK256_OUTPUT_REGITER_8: u32 = 4;
+
+// Address
+pub const ADDRESS_REGISTER_1: u32 = 1;
+pub const ADDRESS_REGISTER_2: u32 = 2;
+pub const ADDRESS_REGISTER_3: u32 = 3;
+pub const ADDRESS_REGISTER_4: u32 = 4;
+pub const ADDRESS_REGISTER_5: u32 = 5;
+
+// Balance
+pub const BALANCE_INPUT_REGISTER_1: u32 = 1;
+pub const BALANCE_INPUT_REGISTER_2: u32 = 2;
+pub const BALANCE_INPUT_REGISTER_3: u32 = 3;
+pub const BALANCE_INPUT_REGISTER_4: u32 = 4;
+pub const BALANCE_INPUT_REGISTER_5: u32 = 5;
+
+pub const BALANCE_OUTPUT_REGISTER_1: u32 = 6;
+pub const BALANCE_OUTPUT_REGISTER_2: u32 = 7;
+pub const BALANCE_OUTPUT_REGISTER_3: u32 = 8;
+pub const BALANCE_OUTPUT_REGISTER_4: u32 = 9;
+pub const BALANCE_OUTPUT_REGISTER_5: u32 = 10;
+pub const BALANCE_OUTPUT_REGISTER_6: u32 = 11;
+pub const BALANCE_OUTPUT_REGISTER_7: u32 = 12;
+pub const BALANCE_OUTPUT_REGISTER_8: u32 = 13;
+
+// Origin
+pub const ORIGIN_OUTPUT_REGISTER_1: u32 = 1;
+pub const ORIGIN_OUTPUT_REGISTER_2: u32 = 2;
+pub const ORIGIN_OUTPUT_REGISTER_3: u32 = 3;
+pub const ORIGIN_OUTPUT_REGISTER_4: u32 = 4;
+pub const ORIGIN_OUTPUT_REGISTER_5: u32 = 5;
+
+// Origin
+pub const CALLER_OUTPUT_REGISTER_1: u32 = 1;
+pub const CALLER_OUTPUT_REGISTER_2: u32 = 2;
+pub const CALLER_OUTPUT_REGISTER_3: u32 = 3;
+pub const CALLER_OUTPUT_REGISTER_4: u32 = 4;
+pub const CALLER_OUTPUT_REGISTER_5: u32 = 5;

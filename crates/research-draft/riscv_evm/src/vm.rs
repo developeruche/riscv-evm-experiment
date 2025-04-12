@@ -714,9 +714,9 @@ impl Vm {
 
 #[cfg(test)]
 mod test {
-    use crate::context::Context;
-
     use super::Vm;
+    use crate::context::Context;
+    use revm::{Context as EthContext, MainContext, database::EmptyDB};
 
     #[test]
     fn test_vm_run() {
@@ -724,7 +724,8 @@ mod test {
             4278255891, 1123875, 5244179, 10487187, 11863139, 11863475, 16777455, 12656771,
             16843027, 115, 1410451, 32871,
         ];
-        let mut context = Context::default();
+        let eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+        let mut context = Context::new(eth_context);
         let mut vm = Vm::from_bin(code).unwrap();
         vm.run(true, &mut context);
     }
