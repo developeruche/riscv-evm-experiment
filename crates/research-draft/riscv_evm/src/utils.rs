@@ -169,6 +169,33 @@ pub fn u32_vec_to_bytes(u32_values: &[u32], byte_len: usize) -> Vec<u8> {
     result
 }
 
+/// Combines two u32 values into a single u64
+///
+/// # Arguments
+/// * `high` - The high 32 bits of the resulting u64
+/// * `low` - The low 32 bits of the resulting u64
+///
+/// # Returns
+/// A u64 where the high 32 bits are from `high` and the low 32 bits are from `low`
+pub fn combine_u32_to_u64(high: u32, low: u32) -> u64 {
+    ((high as u64) << 32) | (low as u64)
+}
+
+/// Splits a u64 into two u32 values
+///
+/// # Arguments
+/// * `value` - The u64 value to split
+///
+/// # Returns
+/// A tuple (high, low) where:
+/// * `high` contains the high 32 bits of the input
+/// * `low` contains the low 32 bits of the input
+pub fn split_u64_to_u32(value: u64) -> (u32, u32) {
+    let high = (value >> 32) as u32;
+    let low = value as u32;
+    (high, low)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -358,5 +385,71 @@ mod test {
         let result = u32_vec_to_bytes(&u32_values, calldata.len());
 
         assert_eq!(result, calldata);
+    }
+
+    #[test]
+    fn test_combine_u32_to_u64() {
+        // Test case 1: Basic combination
+        let high = 0x12345678;
+        let low = 0x9ABCDEF0;
+        assert_eq!(combine_u32_to_u64(high, low), 0x123456789ABCDEF0);
+
+        // Test case 2: With zeros
+        assert_eq!(combine_u32_to_u64(0, 0), 0);
+
+        // Test case 3: Only high bits
+        assert_eq!(combine_u32_to_u64(0x12345678, 0), 0x1234567800000000);
+
+        // Test case 4: Only low bits
+        assert_eq!(combine_u32_to_u64(0, 0x9ABCDEF0), 0x00000000_9ABCDEF0);
+
+        // Test case 5: Maximum values
+        assert_eq!(combine_u32_to_u64(u32::MAX, u32::MAX), u64::MAX);
+    }
+
+    #[test]
+    fn test_split_u64_to_u32() {
+        // Test case 1: Basic split
+        let value = 0x123456789ABCDEF0;
+        let (high, low) = split_u64_to_u32(value);
+        assert_eq!(high, 0x12345678);
+        assert_eq!(low, 0x9ABCDEF0);
+
+        // Test case 2: With zeros
+        let (high, low) = split_u64_to_u32(0);
+        assert_eq!(high, 0);
+        assert_eq!(low, 0);
+
+        // Test case 3: Only high bits
+        let (high, low) = split_u64_to_u32(0x1234567800000000);
+        assert_eq!(high, 0x12345678);
+        assert_eq!(low, 0);
+
+        // Test case 4: Only low bits
+        let (high, low) = split_u64_to_u32(0x00000000_9ABCDEF0);
+        assert_eq!(high, 0);
+        assert_eq!(low, 0x9ABCDEF0);
+
+        // Test case 5: Maximum values
+        let (high, low) = split_u64_to_u32(u64::MAX);
+        assert_eq!(high, u32::MAX);
+        assert_eq!(low, u32::MAX);
+    }
+
+    #[test]
+    fn test_roundtrip_conversion() {
+        // Test case: Round-trip conversion
+        let original_high = 0x12345678;
+        let original_low = 0x9ABCDEF0;
+
+        // Combine
+        let combined = combine_u32_to_u64(original_high, original_low);
+
+        // Split
+        let (result_high, result_low) = split_u64_to_u32(combined);
+
+        // Verify
+        assert_eq!(result_high, original_high);
+        assert_eq!(result_low, original_low);
     }
 }
