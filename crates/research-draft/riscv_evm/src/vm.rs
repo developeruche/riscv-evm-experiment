@@ -4,7 +4,7 @@ use crate::{
     ecall_manager::process_ecall,
     elf_parser::Elf,
     instructions::InstructionDecoder,
-    utils::{process_load_to_reg, process_store_to_memory},
+    utils::{bytes_to_u32_vec, process_load_to_reg, process_store_to_memory},
 };
 use riscv_evm_core::{
     Memory, MemoryChuckSize, Registers, interfaces::MemoryInterface, sign_extend_u32,
@@ -77,6 +77,16 @@ impl Vm {
         Ok(Self {
             registers: Registers::new(),
             memory: Memory::new_with_load_program(&instructions, 0),
+            pc: 0,
+            running: false,
+            exit_code: 0,
+        })
+    }
+
+    pub fn from_bin_u8(instructions: Vec<u8>) -> Result<Self, anyhow::Error> {
+        Ok(Self {
+            registers: Registers::new(),
+            memory: Memory::new_with_load_program(&bytes_to_u32_vec(&instructions), 0),
             pc: 0,
             running: false,
             exit_code: 0,
@@ -717,7 +727,7 @@ impl Vm {
 #[cfg(test)]
 mod test {
     use super::Vm;
-    use crate::context::Context;
+    use crate::{context::Context, utils::u32_vec_to_bytes};
     use revm::{Context as EthContext, MainContext, database::EmptyDB};
 
     #[test]
@@ -729,6 +739,19 @@ mod test {
         let eth_context = EthContext::mainnet().with_db(EmptyDB::default());
         let mut context = Context::new(eth_context);
         let mut vm = Vm::from_bin(code).unwrap();
+        vm.run(true, &mut context);
+    }
+
+    #[test]
+    fn test_vm_run_with_u8() {
+        let code: Vec<u32> = vec![
+            4278255891, 1123875, 5244179, 10487187, 11863139, 11863475, 16777455, 12656771,
+            16843027, 115, 1410451, 32871,
+        ];
+        let code = u32_vec_to_bytes(&code, code.len() * 4);
+        let eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+        let mut context = Context::new(eth_context);
+        let mut vm = Vm::from_bin_u8(code).unwrap();
         vm.run(true, &mut context);
     }
 }

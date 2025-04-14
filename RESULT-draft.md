@@ -34,6 +34,8 @@ In my opinion, developers attracted through this campaign would still need to le
 
 2. Ethereum going the route of using Riscv this way (that is keeping the initial design philosophy of the EVM) would carry alot of overhead cost, computationally and developer's experience. I am of the opinion to ditch the initial design philosophy of the EVM completely and use a more modern approach (e.g., RISC-V...), we would need to redefine the blockchain storage, addresses, signature schemes and so on. This is not to undermine the technological exploits birthed in the EVM, but a transistion of this nature would be a significant undertaking, so much is changing, so much could break. Leaving this big questions, how does the future look like? are we (developers) every going to see a future where these innovations will be implemented? Are we (Ethereum decision makers) going to off-load this innovation burden to L2 teams (which would have less resources, and  this could lead to more fagmentations we current trying to solve)... This are really hard questions which need to be answered. it quite funny how these questions gets some persons angry at me, it needs to be addressed either way.
 
+some ethereum opcodes almost consumes all the registers of the RISV VM (SSTORE, LOG2), sometimes, it actually comsumes all needed more registers for it operation (LOG3, LOG4).
+
 3. It would be nice to have my concluding on the result placed in the beginning and end of the document.
 
 4. I can assure with high certainty that this experimental code is buggy and should not be used for anything looking like a production environment.

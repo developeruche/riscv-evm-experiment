@@ -585,4 +585,68 @@ mod test {
         let converted_back = u32_vec_to_u256(&u32_vec);
         assert_eq!(converted_back, max_u256);
     }
+
+    #[test]
+    fn test_u32_vec_to_bytes() {
+        // Test case with multiple values
+        let values = vec![0x12345678, 0x9ABCDEF0, 0x01020304];
+        let bytes = u32_vec_to_bytes(&values, values.len() * 4);
+
+        assert_eq!(bytes.len(), 12); // 3 u32s * 4 bytes each
+        assert_eq!(
+            bytes,
+            vec![
+                0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x01, 0x02, 0x03, 0x04
+            ]
+        );
+
+        // Test with empty vector
+        let empty: Vec<u32> = vec![];
+        assert_eq!(u32_vec_to_bytes(&empty, 0), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn test_bytes_to_u32_vec() {
+        // Test case with multiple values
+        let bytes = vec![
+            0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x01, 0x02, 0x03, 0x04,
+        ];
+        let values = bytes_to_u32_vec(&bytes);
+
+        assert_eq!(values.len(), 3);
+        assert_eq!(values, vec![0x12345678, 0x9ABCDEF0, 0x01020304]);
+
+        // Test with empty vector
+        let empty: Vec<u8> = vec![];
+        assert_eq!(bytes_to_u32_vec(&empty), Vec::<u32>::new());
+
+        // Test with incomplete bytes (not multiple of 4)
+        let incomplete = vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE];
+        let values = bytes_to_u32_vec(&incomplete);
+
+        assert_eq!(values.len(), 2); // Only one complete u32
+        assert_eq!(values, vec![0x12345678, 0x9ABCDE00]);
+    }
+
+    #[test]
+    fn test_round_trip() {
+        // Test round-trip conversion
+        let original = vec![0x01234567, 0x89ABCDEF, 0xFEDCBA98, 0x76543210];
+        let bytes = u32_vec_to_bytes(&original, original.len() * 4);
+        let roundtrip = bytes_to_u32_vec(&bytes);
+
+        assert_eq!(roundtrip, original);
+    }
+
+    #[test]
+    fn test_performance_large_vector() {
+        // Generate a large test vector
+        let large_vector: Vec<u32> = (0..10_000).collect();
+
+        // Convert to bytes and back
+        let bytes = u32_vec_to_bytes(&large_vector, large_vector.len() * 4);
+        let roundtrip = bytes_to_u32_vec(&bytes);
+
+        assert_eq!(roundtrip, large_vector);
+    }
 }
