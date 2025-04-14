@@ -26,6 +26,8 @@ pub enum VMErrors {
     InvalidFunct7(u32),
     InvalidFunct3(u32),
     EnvirmentCallErrorWithDetail(String),
+    VMAccountLoadFailed,
+    VMCreateError(u32),
 }
 
 #[derive(Debug, Clone)]

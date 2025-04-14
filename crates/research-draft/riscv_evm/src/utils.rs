@@ -196,6 +196,43 @@ pub fn split_u64_to_u32(value: u64) -> (u32, u32) {
     (high, low)
 }
 
+/// Converts a 32-byte value (U256) into a vector of 8 u32 values (big-endian format)
+pub fn u256_to_u32_vec(value: &[u8; 32]) -> Vec<u32> {
+    let mut result = Vec::with_capacity(8);
+
+    // Process 4 bytes at a time
+    for chunk_idx in 0..8 {
+        let offset = chunk_idx * 4;
+        let value = u32::from_be_bytes([
+            value[offset],
+            value[offset + 1],
+            value[offset + 2],
+            value[offset + 3],
+        ]);
+        result.push(value);
+    }
+
+    result
+}
+
+/// Converts a vector of 8 u32 values back to a 32-byte value (U256)
+pub fn u32_vec_to_u256(u32_values: &[u32]) -> [u8; 32] {
+    assert_eq!(u32_values.len(), 8, "Expected exactly 8 u32 values");
+
+    let mut result = [0u8; 32];
+
+    // Process each u32 and extract its 4 bytes
+    for (idx, &value) in u32_values.iter().enumerate() {
+        let bytes = value.to_be_bytes();
+        let offset = idx * 4;
+
+        // Copy the 4 bytes to the appropriate position
+        result[offset..offset + 4].copy_from_slice(&bytes);
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -451,5 +488,101 @@ mod test {
         // Verify
         assert_eq!(result_high, original_high);
         assert_eq!(result_low, original_low);
+    }
+
+    #[test]
+    fn test_address_conversion_2() {
+        // Example Ethereum address (20 bytes)
+        let address = [
+            0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc,
+            0xde, 0xf0, 0x12, 0x34, 0x56, 0x78,
+        ];
+
+        // Convert to u32 vector
+        let u32_vec = address_to_u32_vec(&address);
+
+        // Check length and values
+        assert_eq!(u32_vec.len(), 5);
+        assert_eq!(u32_vec[0], 0x12345678);
+        assert_eq!(u32_vec[1], 0x9abcdef0);
+        assert_eq!(u32_vec[2], 0x12345678);
+        assert_eq!(u32_vec[3], 0x9abcdef0);
+        assert_eq!(u32_vec[4], 0x12345678);
+
+        // Convert back to address
+        let converted_back = u32_vec_to_address(&u32_vec);
+
+        // Check round trip conversion
+        assert_eq!(converted_back, address);
+    }
+
+    #[test]
+    #[should_panic(expected = "Expected exactly 5 u32 values")]
+    fn test_incorrect_length() {
+        // Try to convert a vector with incorrect length
+        let invalid_vec = vec![0x12345678, 0x9abcdef0]; // Only 2 values
+        u32_vec_to_address(&invalid_vec); // Should panic
+    }
+
+    #[test]
+    fn test_u256_conversion() {
+        // Example 32-byte value (U256)
+        let u256_value = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
+            0xee, 0xff, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98,
+            0x76, 0x54, 0x32, 0x10,
+        ];
+
+        // Convert to u32 vector
+        let u32_vec = u256_to_u32_vec(&u256_value);
+
+        // Check length and values
+        assert_eq!(u32_vec.len(), 8);
+        assert_eq!(u32_vec[0], 0x00112233);
+        assert_eq!(u32_vec[1], 0x44556677);
+        assert_eq!(u32_vec[2], 0x8899aabb);
+        assert_eq!(u32_vec[3], 0xccddeeff);
+        assert_eq!(u32_vec[4], 0x01234567);
+        assert_eq!(u32_vec[5], 0x89abcdef);
+        assert_eq!(u32_vec[6], 0xfedcba98);
+        assert_eq!(u32_vec[7], 0x76543210);
+
+        // Convert back to U256
+        let converted_back = u32_vec_to_u256(&u32_vec);
+
+        // Check round trip conversion
+        assert_eq!(converted_back, u256_value);
+    }
+
+    #[test]
+    #[should_panic(expected = "Expected exactly 8 u32 values")]
+    fn test_incorrect_length_u256() {
+        // Try to convert a vector with incorrect length
+        let invalid_vec = vec![0x12345678, 0x9abcdef0, 0x11223344]; // Only 3 values
+        u32_vec_to_u256(&invalid_vec); // Should panic
+    }
+
+    #[test]
+    fn test_u256_zero() {
+        // Test with all zeros
+        let zero_u256 = [0u8; 32];
+        let u32_vec = u256_to_u32_vec(&zero_u256);
+
+        assert_eq!(u32_vec, vec![0u32; 8]);
+
+        let converted_back = u32_vec_to_u256(&u32_vec);
+        assert_eq!(converted_back, zero_u256);
+    }
+
+    #[test]
+    fn test_u256_max() {
+        // Test with all ones (maximum value)
+        let max_u256 = [0xff; 32];
+        let u32_vec = u256_to_u32_vec(&max_u256);
+
+        assert_eq!(u32_vec, vec![0xffffffff; 8]);
+
+        let converted_back = u32_vec_to_u256(&u32_vec);
+        assert_eq!(converted_back, max_u256);
     }
 }

@@ -27,3 +27,13 @@ In my opinion, developers attracted through this campaign would still need to le
 **My point: It is not going to be all roses. While it would certainly reduce the learning curve—with no need to pick up a new language like Solidity—we shouldn't forget there is still significant work to be done.**
 
 # DRAFT RESULT
+
+
+# Some Note (not-formal, just for me)
+1. I am not doing this like warming storage and other stuffs because I am currently not handle gas metering in this Draft Experiment, it is Kinda out of scope for. In the Final Result all these and others would be included the final result goal is to be Identical to the original EVM, this is to be fare on compute benchs.
+
+2. Ethereum going the route of using Riscv this way (that is keeping the initial design philosophy of the EVM) would carry alot of overhead cost, computationally and developer's experience. I am of the opinion to ditch the initial design philosophy of the EVM completely and use a more modern approach (e.g., RISC-V...), we would need to redefine the blockchain storage, addresses, signature schemes and so on. This is not to undermine the technological exploits birthed in the EVM, but a transistion of this nature would be a significant undertaking, so much is changing, so much could break. Leaving this big questions, how does the future look like? are we (developers) every going to see a future where these innovations will be implemented? Are we (Ethereum decision makers) going to off-load this innovation burden to L2 teams (which would have less resources, and  this could lead to more fagmentations we current trying to solve)... This are really hard questions which need to be answered. it quite funny how these questions gets some persons angry at me, it needs to be addressed either way.
+
+3. It would be nice to have my concluding on the result placed in the beginning and end of the document.
+
+4. I can assure with high certainty that this experimental code is buggy and should not be used for anything looking like a production environment.

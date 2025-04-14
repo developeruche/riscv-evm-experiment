@@ -84,6 +84,10 @@ pub enum RiscvEVMECalls {
     StaticCall,
     /// Halt execution reverting state changes but returning data and remaining gas [offset, size]
     Revert,
+    /// Loads a word (32-bytes) from storage
+    SLoad,
+    /// Stores a word (32-bytes) from storage
+    SStore,
 }
 
 impl RiscvEVMECalls {
@@ -383,3 +387,84 @@ pub const GAS_OUTPUT_REGISTER_5: u32 = 5;
 pub const GAS_OUTPUT_REGISTER_6: u32 = 6;
 pub const GAS_OUTPUT_REGISTER_7: u32 = 7;
 pub const GAS_OUTPUT_REGISTER_8: u32 = 8;
+
+// Log0
+pub const LOG0_INPUT_REGISTER_1: u32 = 1;
+pub const LOG0_INPUT_REGISTER_2: u32 = 2;
+
+// Log1
+pub const LOG1_INPUT_REGISTER_1: u32 = 1;
+pub const LOG1_INPUT_REGISTER_2: u32 = 2;
+pub const LOG1_INPUT_REGISTER_3: u32 = 3;
+pub const LOG1_INPUT_REGISTER_4: u32 = 4;
+pub const LOG1_INPUT_REGISTER_5: u32 = 5;
+pub const LOG1_INPUT_REGISTER_6: u32 = 6;
+pub const LOG1_INPUT_REGISTER_7: u32 = 7;
+pub const LOG1_INPUT_REGISTER_8: u32 = 8;
+pub const LOG1_INPUT_REGISTER_9: u32 = 9;
+pub const LOG1_INPUT_REGISTER_10: u32 = 10;
+
+// Log2
+
+// Log3
+
+// Log4
+
+// Create
+pub const CREATE_INPUT_REGISTER_1: u32 = 1;
+pub const CREATE_INPUT_REGISTER_2: u32 = 2;
+
+// Call
+
+// CallCode
+
+// Return
+pub const RETURN_INPUT_REGISTER_1: u32 = 1;
+pub const RETURN_INPUT_REGISTER_2: u32 = 2;
+
+// DelegateCall
+
+// Create2
+
+// StaticCall
+
+// Revert
+pub const REVERT_INPUT_REGISTER_1: u32 = 1;
+pub const REVERT_INPUT_REGISTER_2: u32 = 2;
+
+// SLoad
+pub const SLOAD_INPUT_REGISTER_1: u32 = 1;
+pub const SLOAD_INPUT_REGISTER_2: u32 = 2;
+pub const SLOAD_INPUT_REGISTER_3: u32 = 3;
+pub const SLOAD_INPUT_REGISTER_4: u32 = 4;
+pub const SLOAD_INPUT_REGISTER_5: u32 = 5;
+pub const SLOAD_INPUT_REGISTER_6: u32 = 6;
+pub const SLOAD_INPUT_REGISTER_7: u32 = 7;
+pub const SLOAD_INPUT_REGISTER_8: u32 = 8;
+
+pub const SLOAD_OUTPUT_REGISTER_1: u32 = 9;
+pub const SLOAD_OUTPUT_REGISTER_2: u32 = 10;
+pub const SLOAD_OUTPUT_REGISTER_3: u32 = 11;
+pub const SLOAD_OUTPUT_REGISTER_4: u32 = 12;
+pub const SLOAD_OUTPUT_REGISTER_5: u32 = 13;
+pub const SLOAD_OUTPUT_REGISTER_6: u32 = 14;
+pub const SLOAD_OUTPUT_REGISTER_7: u32 = 15;
+pub const SLOAD_OUTPUT_REGISTER_8: u32 = 16;
+
+// SStore
+pub const SSTORE_INPUT_REGISTER_1: u32 = 1;
+pub const SSTORE_INPUT_REGISTER_2: u32 = 2;
+pub const SSTORE_INPUT_REGISTER_3: u32 = 3;
+pub const SSTORE_INPUT_REGISTER_4: u32 = 4;
+pub const SSTORE_INPUT_REGISTER_5: u32 = 5;
+pub const SSTORE_INPUT_REGISTER_6: u32 = 6;
+pub const SSTORE_INPUT_REGISTER_7: u32 = 7;
+pub const SSTORE_INPUT_REGISTER_8: u32 = 8;
+pub const SSTORE_INPUT_REGISTER_9: u32 = 9;
+pub const SSTORE_INPUT_REGISTER_10: u32 = 10;
+pub const SSTORE_INPUT_REGISTER_11: u32 = 11;
+pub const SSTORE_INPUT_REGISTER_12: u32 = 12;
+pub const SSTORE_INPUT_REGISTER_13: u32 = 13;
+pub const SSTORE_INPUT_REGISTER_14: u32 = 14;
+pub const SSTORE_INPUT_REGISTER_15: u32 = 15;
+pub const SSTORE_INPUT_REGISTER_16: u32 = 16;

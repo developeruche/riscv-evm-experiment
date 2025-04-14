@@ -2,14 +2,16 @@ use crate::{
     context::Context,
     utils::{
         bytes_to_u32, bytes_to_u32_vec, combine_u32_to_u64, split_u64_to_u32, u32_vec_to_address,
+        u32_vec_to_u256,
     },
     vm::{VMErrors, Vm},
 };
 use revm::{
+    Database,
     bytecode::opcode::OR,
-    context::ContextTr,
+    context::{ContextTr, JournalTr},
     interpreter::Host,
-    primitives::{Address, keccak256, ruint::aliases::U256},
+    primitives::{Address, B256, Log, LogData, U256, keccak256},
 };
 use riscv_evm_core::{MemoryChuckSize, e_constants::*, interfaces::MemoryInterface};
 
@@ -806,7 +808,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 Ok(())
             }
             RiscvEVMECalls::Gas => {
-                // Return the amount of gas left to 8 registers
+                // Return the amount of gas left to 8 registers (this vm is not gas metered yet... :())
                 let gas_left: [u8; 32] = U256::ZERO.to_be_bytes();
 
                 // writing 256 bits to 8 regiters
@@ -829,19 +831,214 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 Ok(())
             }
-            RiscvEVMECalls::Log0 => todo!(),
-            RiscvEVMECalls::Log1 => todo!(),
-            RiscvEVMECalls::Log2 => todo!(),
-            RiscvEVMECalls::Log3 => todo!(),
-            RiscvEVMECalls::Log4 => todo!(),
-            RiscvEVMECalls::Create => todo!(),
+            RiscvEVMECalls::Log0 => {
+                let offset = vm.registers.read_reg(LOG0_INPUT_REGISTER_1);
+                let size = vm.registers.read_reg(LOG0_INPUT_REGISTER_2);
+
+                let mut data = vec![0u8; size as usize];
+
+                for i in offset..(offset + size) {
+                    data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
+                }
+
+                let log_data = LogData::new_unchecked(vec![], data.into());
+                let log = Log {
+                    address: context.address,
+                    data: log_data,
+                };
+                context.eth_context.log(log);
+
+                Ok(())
+            }
+            RiscvEVMECalls::Log1 => {
+                let offset = vm.registers.read_reg(LOG1_INPUT_REGISTER_1);
+                let size = vm.registers.read_reg(LOG1_INPUT_REGISTER_2);
+
+                let mut data = vec![0u8; size as usize];
+
+                for i in offset..(offset + size) {
+                    data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
+                }
+
+                let topic_1 = vm.registers.read_reg(LOG1_INPUT_REGISTER_3);
+                let topic_2 = vm.registers.read_reg(LOG1_INPUT_REGISTER_4);
+                let topic_3 = vm.registers.read_reg(LOG1_INPUT_REGISTER_5);
+                let topic_4 = vm.registers.read_reg(LOG1_INPUT_REGISTER_6);
+                let topic_5 = vm.registers.read_reg(LOG1_INPUT_REGISTER_7);
+                let topic_6 = vm.registers.read_reg(LOG1_INPUT_REGISTER_8);
+                let topic_7 = vm.registers.read_reg(LOG1_INPUT_REGISTER_9);
+                let topic_8 = vm.registers.read_reg(LOG1_INPUT_REGISTER_10);
+
+                let topic = u32_vec_to_u256(&vec![
+                    topic_1, topic_2, topic_3, topic_4, topic_5, topic_6, topic_7, topic_8,
+                ]);
+                let log_data = LogData::new_unchecked(vec![B256::new(topic)], data.into());
+                let log = Log {
+                    address: context.address,
+                    data: log_data,
+                };
+                context.eth_context.log(log);
+
+                Ok(())
+            }
+            RiscvEVMECalls::Log2 => {
+                // TODO: Implement Log2 (would not be implementing this, it would consume to much registers, a better way to go around this would to store the topic in memory not in a register (or stack in the case of the native evm))
+                Ok(())
+            }
+            RiscvEVMECalls::Log3 => {
+                // TODO: Implement Log3 (would not be implementing this, it would consume to much registers, a better way to go around this would to store the topic in memory not in a register (or stack in the case of the native evm))
+                Ok(())
+            }
+            RiscvEVMECalls::Log4 => {
+                // TODO: Implement Log4 (would not be implementing this, it would consume to much registers, a better way to go around this would to store the topic in memory not in a register (or stack in the case of the native evm))
+                Ok(())
+            }
+            RiscvEVMECalls::Create => {
+                // First the initcode is obtained from the tx.data
+                // Then the address is calculated using the tx.sender and nonce
+                // Finally the contract is created using the initcode and address
+                // This process returns the runtime code, which is then stored in the account's code section
+                let contract_creator = context.eth_context.caller();
+                let old_nonce;
+                if let Some(nonce) = context
+                    .eth_context
+                    .journal()
+                    .inc_account_nonce(contract_creator)
+                    .map_err(|_| VMErrors::VMCreateError(0))?
+                {
+                    old_nonce = nonce - 1;
+                } else {
+                    return Err(VMErrors::VMCreateError(1));
+                }
+                let new_contract_address = contract_creator.create(old_nonce);
+
+                // Next up is to run the init-code against this new address, this would perform the initialization of the smart contract
+                // This would do the storage setup and initialization, and returns the runtime code
+
+                Ok(())
+            }
             RiscvEVMECalls::Call => todo!(),
             RiscvEVMECalls::CallCode => todo!(),
-            RiscvEVMECalls::Return => todo!(),
+            RiscvEVMECalls::Return => {
+                // This ECALL Halts the vm returning the output
+                vm.running = false;
+
+                let offset = vm.registers.read_reg(RETURN_INPUT_REGISTER_1);
+                let size = vm.registers.read_reg(RETURN_INPUT_REGISTER_2);
+
+                let mut data = vec![0u8; size as usize];
+
+                for i in offset..(offset + size) {
+                    data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
+                }
+
+                context.return_data = data.into();
+
+                let _ = context.eth_context.journal().checkpoint();
+                context.eth_context.journal().checkpoint_commit();
+                context.eth_context.journal().finalize();
+
+                Ok(())
+            }
             RiscvEVMECalls::DelegateCall => todo!(),
             RiscvEVMECalls::Create2 => todo!(),
             RiscvEVMECalls::StaticCall => todo!(),
-            RiscvEVMECalls::Revert => todo!(),
+            RiscvEVMECalls::Revert => {
+                // This ECALL Halts the vm returning the output, reverting state changes using the journal
+                vm.running = false;
+
+                let offset = vm.registers.read_reg(REVERT_INPUT_REGISTER_1);
+                let size = vm.registers.read_reg(REVERT_INPUT_REGISTER_2);
+
+                let mut data = vec![0u8; size as usize];
+
+                for i in offset..(offset + size) {
+                    data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
+                }
+
+                context.return_data = data.into();
+
+                let check_point = context.eth_context.journal().checkpoint();
+                context.eth_context.journal().checkpoint_revert(check_point);
+                context.eth_context.journal().finalize();
+
+                Ok(())
+            }
+            RiscvEVMECalls::SLoad => {
+                let slot_1 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_1);
+                let slot_2 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_2);
+                let slot_3 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_3);
+                let slot_4 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_4);
+                let slot_5 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_5);
+                let slot_6 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_6);
+                let slot_7 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_7);
+                let slot_8 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_8);
+
+                let slot = u32_vec_to_u256(&vec![
+                    slot_1, slot_2, slot_3, slot_4, slot_5, slot_6, slot_7, slot_8,
+                ]);
+
+                let value: [u8; 32] = context
+                    .eth_context
+                    .sload(context.address, U256::from_be_bytes(slot))
+                    .unwrap_or_default()
+                    .data
+                    .to_be_bytes();
+
+                // writing 256 bits to 8 regiters
+                vm.registers
+                    .write_reg(SLOAD_OUTPUT_REGISTER_1, bytes_to_u32(&value[0..4]));
+                vm.registers
+                    .write_reg(SLOAD_OUTPUT_REGISTER_2, bytes_to_u32(&value[4..8]));
+                vm.registers
+                    .write_reg(SLOAD_OUTPUT_REGISTER_3, bytes_to_u32(&value[8..12]));
+                vm.registers
+                    .write_reg(SLOAD_OUTPUT_REGISTER_4, bytes_to_u32(&value[12..16]));
+                vm.registers
+                    .write_reg(SLOAD_OUTPUT_REGISTER_5, bytes_to_u32(&value[16..20]));
+                vm.registers
+                    .write_reg(SLOAD_OUTPUT_REGISTER_6, bytes_to_u32(&value[20..24]));
+                vm.registers
+                    .write_reg(SLOAD_OUTPUT_REGISTER_7, bytes_to_u32(&value[24..28]));
+                vm.registers
+                    .write_reg(SLOAD_OUTPUT_REGISTER_8, bytes_to_u32(&value[28..32]));
+
+                Ok(())
+            }
+            RiscvEVMECalls::SStore => {
+                let slot_1 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_1);
+                let slot_2 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_2);
+                let slot_3 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_3);
+                let slot_4 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_4);
+                let slot_5 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_5);
+                let slot_6 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_6);
+                let slot_7 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_7);
+                let slot_8 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_8);
+
+                let value_1 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_9);
+                let value_2 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_10);
+                let value_3 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_11);
+                let value_4 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_12);
+                let value_5 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_13);
+                let value_6 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_14);
+                let value_7 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_15);
+                let value_8 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_16);
+
+                let slot = u32_vec_to_u256(&vec![
+                    slot_1, slot_2, slot_3, slot_4, slot_5, slot_6, slot_7, slot_8,
+                ]);
+                let value = u32_vec_to_u256(&vec![
+                    value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8,
+                ]);
+
+                context.eth_context.sstore(
+                    context.address,
+                    U256::from_be_bytes(slot),
+                    U256::from_be_bytes(value),
+                );
+
+                Ok(())
+            }
         },
         None => Err(VMErrors::EnvironmentError),
     }
