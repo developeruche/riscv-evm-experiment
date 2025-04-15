@@ -28,6 +28,7 @@ pub enum VMErrors {
     EnvirmentCallErrorWithDetail(String),
     VMAccountLoadFailed,
     VMCreateError(u32),
+    VMCallError(u32),
 }
 
 #[derive(Debug, Clone)]

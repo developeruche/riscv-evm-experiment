@@ -428,6 +428,32 @@ pub const CREATE_OUTPUT_REGISTER_4: u32 = 14;
 pub const CREATE_OUTPUT_REGISTER_5: u32 = 15;
 
 // Call
+pub const CALL_INPUT_REGISTER_1: u32 = 1;
+pub const CALL_INPUT_REGISTER_2: u32 = 2;
+pub const CALL_INPUT_REGISTER_3: u32 = 3;
+pub const CALL_INPUT_REGISTER_4: u32 = 4;
+pub const CALL_INPUT_REGISTER_5: u32 = 5;
+pub const CALL_INPUT_REGISTER_6: u32 = 6;
+pub const CALL_INPUT_REGISTER_7: u32 = 7;
+pub const CALL_INPUT_REGISTER_8: u32 = 8;
+pub const CALL_INPUT_REGISTER_9: u32 = 9;
+pub const CALL_INPUT_REGISTER_10: u32 = 10;
+pub const CALL_INPUT_REGISTER_11: u32 = 11;
+pub const CALL_INPUT_REGISTER_12: u32 = 12;
+pub const CALL_INPUT_REGISTER_13: u32 = 13;
+pub const CALL_INPUT_REGISTER_14: u32 = 14;
+pub const CALL_INPUT_REGISTER_15: u32 = 15;
+pub const CALL_INPUT_REGISTER_16: u32 = 16;
+pub const CALL_INPUT_REGISTER_17: u32 = 17;
+pub const CALL_INPUT_REGISTER_18: u32 = 18;
+pub const CALL_INPUT_REGISTER_19: u32 = 19;
+pub const CALL_INPUT_REGISTER_20: u32 = 20;
+pub const CALL_INPUT_REGISTER_21: u32 = 21;
+pub const CALL_INPUT_REGISTER_22: u32 = 22;
+pub const CALL_INPUT_REGISTER_23: u32 = 23;
+pub const CALL_INPUT_REGISTER_24: u32 = 24;
+pub const CALL_INPUT_REGISTER_25: u32 = 25;
+pub const CALL_INPUT_REGISTER_26: u32 = 26;
 
 // CallCode
 
