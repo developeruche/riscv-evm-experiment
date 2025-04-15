@@ -1,4 +1,4 @@
-#![allow(unused_assignments)]
+#![allow(unused_assignments, unused_variables)]
 
 use crate::{
     context::Context,
@@ -1077,7 +1077,99 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 Ok(())
             }
-            RiscvEVMECalls::CallCode => todo!(),
+            RiscvEVMECalls::CallCode => {
+                // Similar to Call but uses code from specified address while keeping context of current contract
+                // {The Opcode is deprecated}
+                let gas_1 = vm.registers.read_reg(CALL_INPUT_REGISTER_1);
+                let gas_2 = vm.registers.read_reg(CALL_INPUT_REGISTER_2);
+                let gas_3 = vm.registers.read_reg(CALL_INPUT_REGISTER_3);
+                let gas_4 = vm.registers.read_reg(CALL_INPUT_REGISTER_4);
+                let gas_5 = vm.registers.read_reg(CALL_INPUT_REGISTER_5);
+                let gas_6 = vm.registers.read_reg(CALL_INPUT_REGISTER_6);
+                let gas_7 = vm.registers.read_reg(CALL_INPUT_REGISTER_7);
+                let gas_8 = vm.registers.read_reg(CALL_INPUT_REGISTER_8);
+
+                let _gas = u32_vec_to_u256(&vec![
+                    gas_1, gas_2, gas_3, gas_4, gas_5, gas_6, gas_7, gas_8,
+                ]);
+
+                let address_1 = vm.registers.read_reg(CALL_INPUT_REGISTER_9);
+                let address_2 = vm.registers.read_reg(CALL_INPUT_REGISTER_10);
+                let address_3 = vm.registers.read_reg(CALL_INPUT_REGISTER_11);
+                let address_4 = vm.registers.read_reg(CALL_INPUT_REGISTER_12);
+                let address_5 = vm.registers.read_reg(CALL_INPUT_REGISTER_13);
+
+                let address = u32_vec_to_address(&vec![
+                    address_1, address_2, address_3, address_4, address_5,
+                ]);
+
+                let value_1 = vm.registers.read_reg(CALL_INPUT_REGISTER_14);
+                let value_2 = vm.registers.read_reg(CALL_INPUT_REGISTER_15);
+                let value_3 = vm.registers.read_reg(CALL_INPUT_REGISTER_16);
+                let value_4 = vm.registers.read_reg(CALL_INPUT_REGISTER_17);
+                let value_5 = vm.registers.read_reg(CALL_INPUT_REGISTER_18);
+                let value_6 = vm.registers.read_reg(CALL_INPUT_REGISTER_19);
+                let value_7 = vm.registers.read_reg(CALL_INPUT_REGISTER_20);
+                let value_8 = vm.registers.read_reg(CALL_INPUT_REGISTER_21);
+
+                let value = u32_vec_to_u256(&vec![
+                    value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8,
+                ]);
+
+                let args_offset = vm.registers.read_reg(CALL_INPUT_REGISTER_22);
+                let args_size = vm.registers.read_reg(CALL_INPUT_REGISTER_23);
+
+                let return_offset = vm.registers.read_reg(CALL_INPUT_REGISTER_24);
+                let _return_size = vm.registers.read_reg(CALL_INPUT_REGISTER_25);
+
+                let mut call_data = vec![0u8; args_size as usize];
+                for i in args_offset..(args_offset + args_size) {
+                    call_data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
+                }
+
+                let mut new_context = context.clone();
+                // In CallCode, address stays the same (current contract)
+                // but we use code from the target address
+                // new_context.address remains the same as the current address
+                new_context.current_caller = context.current_caller;
+                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                new_context.eth_context.modify_tx(|tx| {
+                    tx.data = call_data.into();
+                });
+
+                // Get code from target address
+                let code = new_context
+                    .eth_context
+                    .load_account_code(Address::from(address))
+                    .unwrap_or_default()
+                    .data;
+
+                // Transfer value if needed (from current contract to current contract)
+                if !U256::from_be_bytes(value).is_zero() {
+                    context
+                        .eth_context
+                        .journal()
+                        .transfer(
+                            new_context.current_caller,
+                            new_context.address,
+                            U256::from_be_bytes(value),
+                        )
+                        .map_err(|_| VMErrors::VMCallError(0))?;
+                }
+
+                let mut new_vm =
+                    Vm::from_bin_u8(code.0.to_vec()).map_err(|_| VMErrors::VMCallError(1))?;
+                new_vm.run(false, &mut new_context);
+
+                // Storing the sub-context return data to memory
+                for (i, byte) in new_context.return_data.iter().enumerate() {
+                    let byte_addr = return_offset + i as u32;
+                    vm.memory
+                        .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
+                }
+
+                Ok(())
+            }
             RiscvEVMECalls::Return => {
                 // This ECALL Halts the vm returning the output
                 vm.running = false;
@@ -1099,7 +1191,76 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 Ok(())
             }
-            RiscvEVMECalls::DelegateCall => todo!(),
+            RiscvEVMECalls::DelegateCall => {
+                // Similar to CallCode but also keeps sender and value from original call
+                let gas_1 = vm.registers.read_reg(CALL_INPUT_REGISTER_1);
+                let gas_2 = vm.registers.read_reg(CALL_INPUT_REGISTER_2);
+                let gas_3 = vm.registers.read_reg(CALL_INPUT_REGISTER_3);
+                let gas_4 = vm.registers.read_reg(CALL_INPUT_REGISTER_4);
+                let gas_5 = vm.registers.read_reg(CALL_INPUT_REGISTER_5);
+                let gas_6 = vm.registers.read_reg(CALL_INPUT_REGISTER_6);
+                let gas_7 = vm.registers.read_reg(CALL_INPUT_REGISTER_7);
+                let gas_8 = vm.registers.read_reg(CALL_INPUT_REGISTER_8);
+
+                let _gas = u32_vec_to_u256(&vec![
+                    gas_1, gas_2, gas_3, gas_4, gas_5, gas_6, gas_7, gas_8,
+                ]);
+
+                let address_1 = vm.registers.read_reg(CALL_INPUT_REGISTER_9);
+                let address_2 = vm.registers.read_reg(CALL_INPUT_REGISTER_10);
+                let address_3 = vm.registers.read_reg(CALL_INPUT_REGISTER_11);
+                let address_4 = vm.registers.read_reg(CALL_INPUT_REGISTER_12);
+                let address_5 = vm.registers.read_reg(CALL_INPUT_REGISTER_13);
+
+                let address = u32_vec_to_address(&vec![
+                    address_1, address_2, address_3, address_4, address_5,
+                ]);
+
+                // No value registers read because DelegateCall preserves the value from the original call
+
+                let args_offset = vm.registers.read_reg(CALL_INPUT_REGISTER_22);
+                let args_size = vm.registers.read_reg(CALL_INPUT_REGISTER_23);
+
+                let return_offset = vm.registers.read_reg(CALL_INPUT_REGISTER_24);
+                let _return_size = vm.registers.read_reg(CALL_INPUT_REGISTER_25);
+
+                let mut call_data = vec![0u8; args_size as usize];
+                for i in args_offset..(args_offset + args_size) {
+                    call_data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
+                }
+
+                let mut new_context = context.clone();
+                // Keep the same address (this contract)
+                // Keep the original caller
+                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                new_context.eth_context.modify_tx(|tx| {
+                    tx.data = call_data.into();
+                    // Keep the same value from original call
+                    tx.value = context.eth_context.tx.value;
+                });
+
+                // Get code from target address
+                let code = new_context
+                    .eth_context
+                    .load_account_code(Address::from(address))
+                    .unwrap_or_default()
+                    .data;
+
+                // No value transfer in DelegateCall
+
+                let mut new_vm =
+                    Vm::from_bin_u8(code.0.to_vec()).map_err(|_| VMErrors::VMCallError(1))?;
+                new_vm.run(false, &mut new_context);
+
+                // Storing the sub-context return data to memory
+                for (i, byte) in new_context.return_data.iter().enumerate() {
+                    let byte_addr = return_offset + i as u32;
+                    vm.memory
+                        .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
+                }
+
+                Ok(())
+            }
             RiscvEVMECalls::Create2 => {
                 // First the initcode is obtained from the tx.data
                 // Then the address is calculated using the tx.sender and nonce
@@ -1208,7 +1369,76 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 Ok(())
             }
-            RiscvEVMECalls::StaticCall => todo!(),
+            RiscvEVMECalls::StaticCall => {
+                // Similar to Call but in static mode - cannot modify state
+                let gas_1 = vm.registers.read_reg(CALL_INPUT_REGISTER_1);
+                let gas_2 = vm.registers.read_reg(CALL_INPUT_REGISTER_2);
+                let gas_3 = vm.registers.read_reg(CALL_INPUT_REGISTER_3);
+                let gas_4 = vm.registers.read_reg(CALL_INPUT_REGISTER_4);
+                let gas_5 = vm.registers.read_reg(CALL_INPUT_REGISTER_5);
+                let gas_6 = vm.registers.read_reg(CALL_INPUT_REGISTER_6);
+                let gas_7 = vm.registers.read_reg(CALL_INPUT_REGISTER_7);
+                let gas_8 = vm.registers.read_reg(CALL_INPUT_REGISTER_8);
+
+                let _gas = u32_vec_to_u256(&vec![
+                    gas_1, gas_2, gas_3, gas_4, gas_5, gas_6, gas_7, gas_8,
+                ]);
+
+                let address_1 = vm.registers.read_reg(CALL_INPUT_REGISTER_9);
+                let address_2 = vm.registers.read_reg(CALL_INPUT_REGISTER_10);
+                let address_3 = vm.registers.read_reg(CALL_INPUT_REGISTER_11);
+                let address_4 = vm.registers.read_reg(CALL_INPUT_REGISTER_12);
+                let address_5 = vm.registers.read_reg(CALL_INPUT_REGISTER_13);
+
+                let address = u32_vec_to_address(&vec![
+                    address_1, address_2, address_3, address_4, address_5,
+                ]);
+
+                // StaticCall doesn't transfer value, so we don't read the value registers
+
+                let args_offset = vm.registers.read_reg(CALL_INPUT_REGISTER_22);
+                let args_size = vm.registers.read_reg(CALL_INPUT_REGISTER_23);
+
+                let return_offset = vm.registers.read_reg(CALL_INPUT_REGISTER_24);
+                let _return_size = vm.registers.read_reg(CALL_INPUT_REGISTER_25);
+
+                let mut call_data = vec![0u8; args_size as usize];
+                for i in args_offset..(args_offset + args_size) {
+                    call_data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
+                }
+
+                let mut new_context = context.clone();
+                new_context.address = Address::from(address);
+                new_context.current_caller = context.address;
+                // Use a new context that's marked as static
+                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                // TODO: Configure to be static
+
+                new_context.eth_context.modify_tx(|tx| {
+                    tx.data = call_data.into();
+                });
+
+                let code = new_context
+                    .eth_context
+                    .load_account_code(new_context.address)
+                    .unwrap_or_default()
+                    .data;
+
+                // No value transfer in StaticCall
+
+                let mut new_vm =
+                    Vm::from_bin_u8(code.0.to_vec()).map_err(|_| VMErrors::VMCallError(1))?;
+                new_vm.run(false, &mut new_context);
+
+                // Storing the sub-context return data to memory
+                for (i, byte) in new_context.return_data.iter().enumerate() {
+                    let byte_addr = return_offset + i as u32;
+                    vm.memory
+                        .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
+                }
+
+                Ok(())
+            }
             RiscvEVMECalls::Revert => {
                 // This ECALL Halts the vm returning the output, reverting state changes using the journal
                 vm.running = false;
