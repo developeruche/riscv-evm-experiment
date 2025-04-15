@@ -1,14 +1,15 @@
+#![allow(unused_assignments)]
+
 use crate::{
     context::Context,
     utils::{
-        address_to_u32_vec, bytes_to_u32, bytes_to_u32_vec, combine_u32_to_u64, split_u64_to_u32,
-        u32_vec_to_address, u32_vec_to_u256,
+        address_to_u32_vec, bytes_to_u32, combine_u32_to_u64, split_u64_to_u32, u32_vec_to_address,
+        u32_vec_to_u256,
     },
     vm::{VMErrors, Vm},
 };
 use revm::{
-    Context as EthContext, Database, MainContext,
-    bytecode::opcode::OR,
+    Context as EthContext, MainContext,
     context::{ContextTr, JournalTr},
     database::EmptyDB,
     interpreter::Host,
@@ -900,8 +901,8 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 // Then the address is calculated using the tx.sender and nonce
                 // Finally the contract is created using the initcode and address
                 // This process returns the runtime code, which is then stored in the account's code section
-                let offset = vm.registers.read_reg(LOG1_INPUT_REGISTER_1);
-                let size = vm.registers.read_reg(LOG1_INPUT_REGISTER_2);
+                let offset = vm.registers.read_reg(CREATE_INPUT_REGISTER_1);
+                let size = vm.registers.read_reg(CREATE_INPUT_REGISTER_2);
 
                 let mut init_code = vec![0u8; size as usize];
 
@@ -909,14 +910,14 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     init_code.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
                 }
 
-                let value_1 = vm.registers.read_reg(LOG1_INPUT_REGISTER_3);
-                let value_2 = vm.registers.read_reg(LOG1_INPUT_REGISTER_4);
-                let value_3 = vm.registers.read_reg(LOG1_INPUT_REGISTER_5);
-                let value_4 = vm.registers.read_reg(LOG1_INPUT_REGISTER_6);
-                let value_5 = vm.registers.read_reg(LOG1_INPUT_REGISTER_7);
-                let value_6 = vm.registers.read_reg(LOG1_INPUT_REGISTER_8);
-                let value_7 = vm.registers.read_reg(LOG1_INPUT_REGISTER_9);
-                let value_8 = vm.registers.read_reg(LOG1_INPUT_REGISTER_10);
+                let value_1 = vm.registers.read_reg(CREATE_INPUT_REGISTER_3);
+                let value_2 = vm.registers.read_reg(CREATE_INPUT_REGISTER_4);
+                let value_3 = vm.registers.read_reg(CREATE_INPUT_REGISTER_5);
+                let value_4 = vm.registers.read_reg(CREATE_INPUT_REGISTER_6);
+                let value_5 = vm.registers.read_reg(CREATE_INPUT_REGISTER_7);
+                let value_6 = vm.registers.read_reg(CREATE_INPUT_REGISTER_8);
+                let value_7 = vm.registers.read_reg(CREATE_INPUT_REGISTER_9);
+                let value_8 = vm.registers.read_reg(CREATE_INPUT_REGISTER_10);
 
                 let value = u32_vec_to_u256(&vec![
                     value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8,
@@ -1099,7 +1100,114 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 Ok(())
             }
             RiscvEVMECalls::DelegateCall => todo!(),
-            RiscvEVMECalls::Create2 => todo!(),
+            RiscvEVMECalls::Create2 => {
+                // First the initcode is obtained from the tx.data
+                // Then the address is calculated using the tx.sender and nonce
+                // Finally the contract is created using the initcode and address
+                // This process returns the runtime code, which is then stored in the account's code section
+                let offset = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_1);
+                let size = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_2);
+
+                let mut init_code = vec![0u8; size as usize];
+
+                for i in offset..(offset + size) {
+                    init_code.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
+                }
+
+                let value_1 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_3);
+                let value_2 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_4);
+                let value_3 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_5);
+                let value_4 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_6);
+                let value_5 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_7);
+                let value_6 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_8);
+                let value_7 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_9);
+                let value_8 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_10);
+
+                let value = u32_vec_to_u256(&vec![
+                    value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8,
+                ]);
+
+                let salt_1 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_11);
+                let salt_2 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_12);
+                let salt_3 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_13);
+                let salt_4 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_14);
+                let salt_5 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_15);
+                let salt_6 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_16);
+                let salt_7 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_17);
+                let salt_8 = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_18);
+
+                let salt = u32_vec_to_u256(&vec![
+                    salt_1, salt_2, salt_3, salt_4, salt_5, salt_6, salt_7, salt_8,
+                ]);
+
+                let contract_creator = context.eth_context.caller();
+                let old_nonce;
+                if let Some(nonce) = context
+                    .eth_context
+                    .journal()
+                    .inc_account_nonce(contract_creator)
+                    .map_err(|_| VMErrors::VMCreateError(0))?
+                {
+                    old_nonce = nonce - 1;
+                } else {
+                    return Err(VMErrors::VMCreateError(1));
+                }
+                let init_code_hash = keccak256(&init_code);
+                let new_contract_address = contract_creator.create2(salt, init_code_hash);
+
+                context
+                    .eth_context
+                    .journal()
+                    .transfer(
+                        contract_creator,
+                        new_contract_address,
+                        U256::from_be_bytes(value),
+                    )
+                    .map_err(|_| VMErrors::VMCreateError(3))?;
+
+                // Next up is to run the init-code against this new address, this would perform the initialization of the smart contract
+                // This would do the storage setup and initialization, and returns the runtime code
+                let mut new_context = context.clone();
+                new_context.address = new_contract_address;
+                new_context.current_caller = contract_creator;
+                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+
+                let mut new_vm =
+                    Vm::from_bin_u8(init_code).map_err(|_| VMErrors::VMCreateError(2))?;
+                new_vm.run(false, &mut new_context);
+
+                let runtime_code = new_context.return_data;
+                context
+                    .eth_context
+                    .journal()
+                    .set_code(new_contract_address, Bytecode::new_legacy(runtime_code));
+
+                context
+                    .eth_context
+                    .journal()
+                    .inc_account_nonce(new_contract_address)
+                    .map_err(|_| VMErrors::VMCreateError(0))?;
+
+                let _ = context.eth_context.journal().checkpoint();
+                context.eth_context.journal().checkpoint_commit();
+                context.eth_context.journal().finalize();
+
+                // storing the created address in a resigter
+                let nc_address_u32s = address_to_u32_vec(&new_contract_address.0);
+
+                vm.registers
+                    .write_reg(CREATE_OUTPUT_REGISTER_1, nc_address_u32s[0]);
+                vm.registers
+                    .write_reg(CREATE_OUTPUT_REGISTER_2, nc_address_u32s[1]);
+                vm.registers
+                    .write_reg(CREATE_OUTPUT_REGISTER_3, nc_address_u32s[2]);
+                vm.registers
+                    .write_reg(CREATE_OUTPUT_REGISTER_4, nc_address_u32s[3]);
+                vm.registers
+                    .write_reg(CREATE_OUTPUT_REGISTER_5, nc_address_u32s[4]);
+
+                Ok(())
+            }
             RiscvEVMECalls::StaticCall => todo!(),
             RiscvEVMECalls::Revert => {
                 // This ECALL Halts the vm returning the output, reverting state changes using the journal
