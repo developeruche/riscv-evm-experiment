@@ -1,3 +1,5 @@
+#![allow(dead_code, unused)]
+
 //! ERC20 RISC-V EVM Benchmark
 //! Performing benches on tasks such as deployment, transfer and balanceOf.
 use criterion::{Criterion, criterion_group, criterion_main};
