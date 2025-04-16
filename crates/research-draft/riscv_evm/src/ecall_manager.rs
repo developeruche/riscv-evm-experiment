@@ -11,7 +11,7 @@ use crate::{
 use revm::{
     Context as EthContext, MainContext,
     context::{ContextTr, JournalTr},
-    database::EmptyDB,
+    database::CacheDB,
     interpreter::Host,
     primitives::{Address, B256, Log, LogData, U256, keccak256},
     state::Bytecode,
@@ -32,9 +32,13 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let size = vm.registers.read_reg(KECCAK256_SIZE_REGISTER);
                 let mut data = vec![0u8; size as usize];
                 for i in 0..size {
-                    data[i as usize] =
-                        vm.memory.read_mem(offset, MemoryChuckSize::BYTE).unwrap() as u8;
+                    data[i as usize] = vm
+                        .memory
+                        .read_mem(offset + i, MemoryChuckSize::BYTE)
+                        .unwrap() as u8;
                 }
+
+                println!("data in code: {:?}", data);
                 let hash = keccak256(&data);
 
                 // writing 256 bits to 8 regiters
@@ -952,7 +956,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let mut new_context = context.clone();
                 new_context.address = new_contract_address;
                 new_context.current_caller = contract_creator;
-                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
 
                 let mut new_vm =
                     Vm::from_bin_u8(init_code).map_err(|_| VMErrors::VMCreateError(2))?;
@@ -1042,7 +1046,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let mut new_context = context.clone();
                 new_context.address = Address::from(address);
                 new_context.current_caller = context.address;
-                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 new_context.eth_context.modify_tx(|tx| {
                     tx.data = call_data.into();
                 });
@@ -1132,7 +1136,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 // but we use code from the target address
                 // new_context.address remains the same as the current address
                 new_context.current_caller = context.current_caller;
-                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 new_context.eth_context.modify_tx(|tx| {
                     tx.data = call_data.into();
                 });
@@ -1232,7 +1236,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let mut new_context = context.clone();
                 // Keep the same address (this contract)
                 // Keep the original caller
-                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 new_context.eth_context.modify_tx(|tx| {
                     tx.data = call_data.into();
                     // Keep the same value from original call
@@ -1331,7 +1335,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let mut new_context = context.clone();
                 new_context.address = new_contract_address;
                 new_context.current_caller = contract_creator;
-                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
 
                 let mut new_vm =
                     Vm::from_bin_u8(init_code).map_err(|_| VMErrors::VMCreateError(2))?;
@@ -1411,7 +1415,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 new_context.address = Address::from(address);
                 new_context.current_caller = context.address;
                 // Use a new context that's marked as static
-                new_context.eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 // TODO: Configure to be static
 
                 new_context.eth_context.modify_tx(|tx| {
@@ -1474,12 +1478,20 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     slot_1, slot_2, slot_3, slot_4, slot_5, slot_6, slot_7, slot_8,
                 ]);
 
+                context.eth_context.journal().warm_account(context.address);
                 let value: [u8; 32] = context
                     .eth_context
+                    .journal()
                     .sload(context.address, U256::from_be_bytes(slot))
-                    .unwrap_or_default()
+                    .map_err(|e| VMErrors::SLoadError(e.to_string()))?
                     .data
                     .to_be_bytes();
+                // let value: [u8; 32] = context
+                //     .eth_context
+                //     .sload(context.address, U256::from_be_bytes(slot))
+                //     .unwrap_or_default()
+                //     .data
+                //     .to_be_bytes();
 
                 // writing 256 bits to 8 regiters
                 vm.registers
@@ -1526,6 +1538,16 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let value = u32_vec_to_u256(&vec![
                     value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8,
                 ]);
+
+                context
+                    .eth_context
+                    .journal()
+                    .load_account(context.address)
+                    .map_err(|e| VMErrors::SStoreError(e.to_string()))?;
+                println!(
+                    "This is the balance from code: {:?}",
+                    context.eth_context.journal().state()
+                );
 
                 context.eth_context.sstore(
                     context.address,

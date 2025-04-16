@@ -29,6 +29,8 @@ pub enum VMErrors {
     VMAccountLoadFailed,
     VMCreateError(u32),
     VMCallError(u32),
+    SLoadError(String),
+    SStoreError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -729,7 +731,7 @@ impl Vm {
 mod test {
     use super::Vm;
     use crate::{context::Context, utils::u32_vec_to_bytes};
-    use revm::{Context as EthContext, MainContext, database::EmptyDB};
+    use revm::{Context as EthContext, MainContext, database::CacheDB};
 
     #[test]
     fn test_vm_run() {
@@ -737,7 +739,7 @@ mod test {
             4278255891, 1123875, 5244179, 10487187, 11863139, 11863475, 16777455, 12656771,
             16843027, 115, 1410451, 32871,
         ];
-        let eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+        let eth_context = EthContext::mainnet().with_db(CacheDB::default());
         let mut context = Context::new(eth_context);
         let mut vm = Vm::from_bin(code).unwrap();
         vm.run(true, &mut context);
@@ -750,7 +752,7 @@ mod test {
             16843027, 115, 1410451, 32871,
         ];
         let code = u32_vec_to_bytes(&code, code.len() * 4);
-        let eth_context = EthContext::mainnet().with_db(EmptyDB::default());
+        let eth_context = EthContext::mainnet().with_db(CacheDB::default());
         let mut context = Context::new(eth_context);
         let mut vm = Vm::from_bin_u8(code).unwrap();
         vm.run(true, &mut context);

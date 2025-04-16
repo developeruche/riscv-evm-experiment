@@ -135,6 +135,8 @@ impl RiscvEVMECalls {
             0xF5 => Some(Self::Create2),
             0xFA => Some(Self::StaticCall),
             0xFD => Some(Self::Revert),
+            0x54 => Some(Self::SLoad),
+            0x55 => Some(Self::SStore),
             _ => None,
         }
     }
