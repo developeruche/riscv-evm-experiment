@@ -4,15 +4,14 @@ use crate::{
     context::Context,
     ecall_manager::process_ecall,
     utils::{address_to_u32_vec, u32_vec_to_address, u32_vec_to_u256, u256_to_u32_vec},
-    vm::{VMErrors, Vm},
+    vm::Vm,
 };
 use revm::{
-    Context as EthContext, DatabaseCommit, MainContext,
-    context::{ContextTr, JournalOutput, JournalTr},
-    database::{CacheDB, Database, EmptyDB, InMemoryDB},
-    inspector::JournalExt,
-    primitives::{Address, B256, Bytes, Log, LogData, U256, keccak256},
-    state::{AccountInfo, Bytecode},
+    Context as EthContext, MainContext,
+    context::ContextTr,
+    database::{CacheDB, InMemoryDB},
+    primitives::{Address, U256, keccak256},
+    state::AccountInfo,
 };
 use riscv_evm_core::{MemoryChuckSize, e_constants::*, interfaces::MemoryInterface};
 use std::str::FromStr;
@@ -72,40 +71,7 @@ fn test_ecall_keccak256() {
     let h8 = vm.registers.read_reg(KECCAK256_OUTPUT_REGITER_8);
 
     // Verify hash matches expected
-    let actual_hash_bytes = [
-        ((h1 >> 24) & 0xFF) as u8,
-        ((h1 >> 16) & 0xFF) as u8,
-        ((h1 >> 8) & 0xFF) as u8,
-        (h1 & 0xFF) as u8,
-        ((h2 >> 24) & 0xFF) as u8,
-        ((h2 >> 16) & 0xFF) as u8,
-        ((h2 >> 8) & 0xFF) as u8,
-        (h2 & 0xFF) as u8,
-        ((h3 >> 24) & 0xFF) as u8,
-        ((h3 >> 16) & 0xFF) as u8,
-        ((h3 >> 8) & 0xFF) as u8,
-        (h3 & 0xFF) as u8,
-        ((h4 >> 24) & 0xFF) as u8,
-        ((h4 >> 16) & 0xFF) as u8,
-        ((h4 >> 8) & 0xFF) as u8,
-        (h4 & 0xFF) as u8,
-        ((h5 >> 24) & 0xFF) as u8,
-        ((h5 >> 16) & 0xFF) as u8,
-        ((h5 >> 8) & 0xFF) as u8,
-        (h5 & 0xFF) as u8,
-        ((h6 >> 24) & 0xFF) as u8,
-        ((h6 >> 16) & 0xFF) as u8,
-        ((h6 >> 8) & 0xFF) as u8,
-        (h6 & 0xFF) as u8,
-        ((h7 >> 24) & 0xFF) as u8,
-        ((h7 >> 16) & 0xFF) as u8,
-        ((h7 >> 8) & 0xFF) as u8,
-        (h7 & 0xFF) as u8,
-        ((h8 >> 24) & 0xFF) as u8,
-        ((h8 >> 16) & 0xFF) as u8,
-        ((h8 >> 8) & 0xFF) as u8,
-        (h8 & 0xFF) as u8,
-    ];
+    let actual_hash_bytes = u32_vec_to_u256(&vec![h1, h2, h3, h4, h5, h6, h7, h8]);
 
     assert_eq!(actual_hash_bytes.to_vec(), expected_hash.0.to_vec());
 }
@@ -226,40 +192,7 @@ fn test_ecall_calldataload() {
 
     // Verify first 32 bytes match expected
     let expected_data = &calldata[0..32];
-    let actual_data = [
-        ((d1 >> 24) & 0xFF) as u8,
-        ((d1 >> 16) & 0xFF) as u8,
-        ((d1 >> 8) & 0xFF) as u8,
-        (d1 & 0xFF) as u8,
-        ((d2 >> 24) & 0xFF) as u8,
-        ((d2 >> 16) & 0xFF) as u8,
-        ((d2 >> 8) & 0xFF) as u8,
-        (d2 & 0xFF) as u8,
-        ((d3 >> 24) & 0xFF) as u8,
-        ((d3 >> 16) & 0xFF) as u8,
-        ((d3 >> 8) & 0xFF) as u8,
-        (d3 & 0xFF) as u8,
-        ((d4 >> 24) & 0xFF) as u8,
-        ((d4 >> 16) & 0xFF) as u8,
-        ((d4 >> 8) & 0xFF) as u8,
-        (d4 & 0xFF) as u8,
-        ((d5 >> 24) & 0xFF) as u8,
-        ((d5 >> 16) & 0xFF) as u8,
-        ((d5 >> 8) & 0xFF) as u8,
-        (d5 & 0xFF) as u8,
-        ((d6 >> 24) & 0xFF) as u8,
-        ((d6 >> 16) & 0xFF) as u8,
-        ((d6 >> 8) & 0xFF) as u8,
-        (d6 & 0xFF) as u8,
-        ((d7 >> 24) & 0xFF) as u8,
-        ((d7 >> 16) & 0xFF) as u8,
-        ((d7 >> 8) & 0xFF) as u8,
-        (d7 & 0xFF) as u8,
-        ((d8 >> 24) & 0xFF) as u8,
-        ((d8 >> 16) & 0xFF) as u8,
-        ((d8 >> 8) & 0xFF) as u8,
-        (d8 & 0xFF) as u8,
-    ];
+    let actual_data = u32_vec_to_u256(&vec![d1, d2, d3, d4, d5, d6, d7, d8]);
 
     assert_eq!(actual_data.to_vec(), expected_data.to_vec());
 }
@@ -403,98 +336,42 @@ fn test_ecall_storage() {
     let result = process_ecall(&mut vm, &mut context);
     assert!(result.is_ok());
 
-    // let mut vm = setup_test_vm();
-    // let mut context = setup_test_context();
+    // Now test SLoad
+    // Set up the VM registers for SLoad
+    vm.registers.write_reg(ECALL_CODE_REG, 0x54); // SLoad
 
-    // // Create a database with account balance
-    // let mut db = InMemoryDB::default();
-    // let test_address = Address::from_str("0x0000000000000000000000000000000000000003").unwrap();
-    // let test_balance = U256::from(1000000);
-    // let account_info = AccountInfo {
-    //     balance: test_balance,
-    //     ..Default::default()
-    // };
-    // db.insert_account_info(test_address, account_info);
+    // Set the key
+    vm.registers.write_reg(SLOAD_INPUT_REGISTER_1, key_u32[0]);
+    vm.registers.write_reg(SLOAD_INPUT_REGISTER_2, key_u32[1]);
+    vm.registers.write_reg(SLOAD_INPUT_REGISTER_3, key_u32[2]);
+    vm.registers.write_reg(SLOAD_INPUT_REGISTER_4, key_u32[3]);
+    vm.registers.write_reg(SLOAD_INPUT_REGISTER_5, key_u32[4]);
+    vm.registers.write_reg(SLOAD_INPUT_REGISTER_6, key_u32[5]);
+    vm.registers.write_reg(SLOAD_INPUT_REGISTER_7, key_u32[6]);
+    vm.registers.write_reg(SLOAD_INPUT_REGISTER_8, key_u32[7]);
 
-    // // Set the database in the context
-    // context.eth_context = EthContext::mainnet().with_db(db);
+    // Process the SLoad ECALL
+    let result = process_ecall(&mut vm, &mut context);
+    assert!(result.is_ok());
 
-    // println!("This is the state: {:?}", context.eth_context.journal().state());
+    // Check the loaded value
+    let loaded_1 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_1);
+    let loaded_2 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_2);
+    let loaded_3 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_3);
+    let loaded_4 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_4);
+    let loaded_5 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_5);
+    let loaded_6 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_6);
+    let loaded_7 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_7);
+    let loaded_8 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_8);
 
-    // // Test key and value for storage
-    // let key = U256::from(42);
-    // let value = U256::from(1234567890);
-
-    // // Convert to u32 arrays
-    // let key_bytes: [u8; 32] = key.to_be_bytes();
-    // let key_u32 = u256_to_u32_vec(&key_bytes);
-
-    // let value_bytes: [u8; 32] = value.to_be_bytes();
-    // let value_u32 = u256_to_u32_vec(&value_bytes);
-
-    // // Set up the VM registers for SStore
-    // vm.registers.write_reg(ECALL_CODE_REG, 0x55); // SStore
-
-    // // Set the key
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_1, key_u32[0]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_2, key_u32[1]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_3, key_u32[2]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_4, key_u32[3]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_5, key_u32[4]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_6, key_u32[5]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_7, key_u32[6]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_8, key_u32[7]);
-
-    // // Set the value
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_9, value_u32[0]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_10, value_u32[1]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_11, value_u32[2]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_12, value_u32[3]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_13, value_u32[4]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_14, value_u32[5]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_15, value_u32[6]);
-    // vm.registers.write_reg(SSTORE_INPUT_REGISTER_16, value_u32[7]);
-
-    // // Process the SStore ECALL
-    // let result = process_ecall(&mut vm, &mut context);
-    // assert!(result.is_ok());
-
-    // // Now test SLoad
-    // // Set up the VM registers for SLoad
-    // vm.registers.write_reg(ECALL_CODE_REG, 0x54); // SLoad
-
-    // // Set the key
-    // vm.registers.write_reg(SLOAD_INPUT_REGISTER_1, key_u32[0]);
-    // vm.registers.write_reg(SLOAD_INPUT_REGISTER_2, key_u32[1]);
-    // vm.registers.write_reg(SLOAD_INPUT_REGISTER_3, key_u32[2]);
-    // vm.registers.write_reg(SLOAD_INPUT_REGISTER_4, key_u32[3]);
-    // vm.registers.write_reg(SLOAD_INPUT_REGISTER_5, key_u32[4]);
-    // vm.registers.write_reg(SLOAD_INPUT_REGISTER_6, key_u32[5]);
-    // vm.registers.write_reg(SLOAD_INPUT_REGISTER_7, key_u32[6]);
-    // vm.registers.write_reg(SLOAD_INPUT_REGISTER_8, key_u32[7]);
-
-    // // Process the SLoad ECALL
-    // let result = process_ecall(&mut vm, &mut context);
-    // assert!(result.is_ok());
-
-    // // Check the loaded value
-    // let loaded_1 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_1);
-    // let loaded_2 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_2);
-    // let loaded_3 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_3);
-    // let loaded_4 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_4);
-    // let loaded_5 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_5);
-    // let loaded_6 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_6);
-    // let loaded_7 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_7);
-    // let loaded_8 = vm.registers.read_reg(SLOAD_OUTPUT_REGISTER_8);
-
-    // assert_eq!(loaded_1, value_u32[0]);
-    // assert_eq!(loaded_2, value_u32[1]);
-    // assert_eq!(loaded_3, value_u32[2]);
-    // assert_eq!(loaded_4, value_u32[3]);
-    // assert_eq!(loaded_5, value_u32[4]);
-    // assert_eq!(loaded_6, value_u32[5]);
-    // assert_eq!(loaded_7, value_u32[6]);
-    // assert_eq!(loaded_8, value_u32[7]);
+    assert_eq!(loaded_1, value_u32[0]);
+    assert_eq!(loaded_2, value_u32[1]);
+    assert_eq!(loaded_3, value_u32[2]);
+    assert_eq!(loaded_4, value_u32[3]);
+    assert_eq!(loaded_5, value_u32[4]);
+    assert_eq!(loaded_6, value_u32[5]);
+    assert_eq!(loaded_7, value_u32[6]);
+    assert_eq!(loaded_8, value_u32[7]);
 }
 
 // Test for Log0 ECALL

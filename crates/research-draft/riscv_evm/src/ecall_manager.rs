@@ -38,7 +38,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .unwrap() as u8;
                 }
 
-                println!("data in code: {:?}", data);
                 let hash = keccak256(&data);
 
                 // writing 256 bits to 8 regiters
@@ -1478,7 +1477,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     slot_1, slot_2, slot_3, slot_4, slot_5, slot_6, slot_7, slot_8,
                 ]);
 
-                context.eth_context.journal().warm_account(context.address);
                 let value: [u8; 32] = context
                     .eth_context
                     .journal()
@@ -1486,12 +1484,12 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     .map_err(|e| VMErrors::SLoadError(e.to_string()))?
                     .data
                     .to_be_bytes();
-                // let value: [u8; 32] = context
-                //     .eth_context
-                //     .sload(context.address, U256::from_be_bytes(slot))
-                //     .unwrap_or_default()
-                //     .data
-                //     .to_be_bytes();
+
+                context
+                    .eth_context
+                    .journal()
+                    .load_account(context.address)
+                    .map_err(|e| VMErrors::SStoreError(e.to_string()))?;
 
                 // writing 256 bits to 8 regiters
                 vm.registers
@@ -1544,10 +1542,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     .journal()
                     .load_account(context.address)
                     .map_err(|e| VMErrors::SStoreError(e.to_string()))?;
-                println!(
-                    "This is the balance from code: {:?}",
-                    context.eth_context.journal().state()
-                );
 
                 context.eth_context.sstore(
                     context.address,
