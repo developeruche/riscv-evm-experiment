@@ -906,7 +906,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     .journal()
                     .load_account(context.address)
                     .map_err(|_| VMErrors::VMCreateError(2))?;
-                let contract_creator = context.eth_context.caller();
+                let contract_creator = context.current_caller;
                 context
                     .eth_context
                     .journal()
@@ -940,7 +940,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let mut new_context = context.clone();
                 new_context.address = new_contract_address;
                 new_context.current_caller = contract_creator;
-                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 let mut new_vm =
                     Vm::from_bin_u8(init_code).map_err(|_| VMErrors::VMCreateError(2))?;
                 new_vm.run(false, &mut new_context);
@@ -1021,7 +1020,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let return_offset = vm.registers.read_reg(CALL_INPUT_REGISTER_24);
                 let _return_size = vm.registers.read_reg(CALL_INPUT_REGISTER_25);
 
-                let mut call_data = vec![0u8; args_size as usize];
+                let mut call_data = Vec::new();
                 for i in args_offset..(args_offset + args_size) {
                     call_data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
                 }
@@ -1029,11 +1028,19 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let mut new_context = context.clone();
                 new_context.address = Address::from(address);
                 new_context.current_caller = context.address;
-                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 new_context.eth_context.modify_tx(|tx| {
                     tx.data = call_data.into();
                 });
-
+                new_context
+                    .eth_context
+                    .journal()
+                    .load_account(new_context.address)
+                    .map_err(|_| VMErrors::VMCallError(1))?;
+                new_context
+                    .eth_context
+                    .journal()
+                    .load_account(new_context.current_caller)
+                    .map_err(|_| VMErrors::VMCallError(1))?;
                 let code = new_context
                     .eth_context
                     .load_account_code(new_context.address)
@@ -1119,7 +1126,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 // but we use code from the target address
                 // new_context.address remains the same as the current address
                 new_context.current_caller = context.current_caller;
-                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 new_context.eth_context.modify_tx(|tx| {
                     tx.data = call_data.into();
                 });
@@ -1219,7 +1225,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let mut new_context = context.clone();
                 // Keep the same address (this contract)
                 // Keep the original caller
-                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 new_context.eth_context.modify_tx(|tx| {
                     tx.data = call_data.into();
                     // Keep the same value from original call
@@ -1293,7 +1298,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     .journal()
                     .load_account(context.address)
                     .map_err(|_| VMErrors::VMCreateError(2))?;
-                let contract_creator = context.eth_context.caller();
+                let contract_creator = context.current_caller;
                 context
                     .eth_context
                     .journal()
@@ -1328,17 +1333,16 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let mut new_context = context.clone();
                 new_context.address = new_contract_address;
                 new_context.current_caller = contract_creator;
-                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
 
                 let mut new_vm =
                     Vm::from_bin_u8(init_code).map_err(|_| VMErrors::VMCreateError(2))?;
                 new_vm.run(false, &mut new_context);
 
                 let runtime_code = new_context.return_data;
-                context
-                    .eth_context
-                    .journal()
-                    .set_code(new_contract_address, Bytecode::new_legacy(runtime_code));
+                context.eth_context.journal().set_code(
+                    new_contract_address,
+                    Bytecode::new_legacy(runtime_code.clone()),
+                );
 
                 context
                     .eth_context
@@ -1353,15 +1357,15 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let nc_address_u32s = address_to_u32_vec(&new_contract_address.0);
 
                 vm.registers
-                    .write_reg(CREATE_OUTPUT_REGISTER_1, nc_address_u32s[0]);
+                    .write_reg(CREATE_2_OUTPUT_REGISTER_1, nc_address_u32s[0]);
                 vm.registers
-                    .write_reg(CREATE_OUTPUT_REGISTER_2, nc_address_u32s[1]);
+                    .write_reg(CREATE_2_OUTPUT_REGISTER_2, nc_address_u32s[1]);
                 vm.registers
-                    .write_reg(CREATE_OUTPUT_REGISTER_3, nc_address_u32s[2]);
+                    .write_reg(CREATE_2_OUTPUT_REGISTER_3, nc_address_u32s[2]);
                 vm.registers
-                    .write_reg(CREATE_OUTPUT_REGISTER_4, nc_address_u32s[3]);
+                    .write_reg(CREATE_2_OUTPUT_REGISTER_4, nc_address_u32s[3]);
                 vm.registers
-                    .write_reg(CREATE_OUTPUT_REGISTER_5, nc_address_u32s[4]);
+                    .write_reg(CREATE_2_OUTPUT_REGISTER_5, nc_address_u32s[4]);
 
                 Ok(())
             }
@@ -1407,7 +1411,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 new_context.address = Address::from(address);
                 new_context.current_caller = context.address;
                 // Use a new context that's marked as static
-                new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
                 // TODO: Configure to be static
 
                 new_context.eth_context.modify_tx(|tx| {
