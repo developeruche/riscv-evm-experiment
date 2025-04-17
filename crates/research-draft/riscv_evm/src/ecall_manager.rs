@@ -946,6 +946,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 new_vm.run(false, &mut new_context);
 
                 let runtime_code = new_context.return_data;
+
                 context
                     .eth_context
                     .journal()
@@ -959,7 +960,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 let _ = context.eth_context.journal().checkpoint();
                 context.eth_context.journal().checkpoint_commit();
-                context.eth_context.journal().finalize();
 
                 // storing the created address in a resigter
                 let nc_address_u32s = address_to_u32_vec(&new_contract_address.0);
@@ -1171,13 +1171,10 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
                 }
 
-                println!("Data: {:?}", data);
-
                 context.return_data = data.into();
 
                 let _ = context.eth_context.journal().checkpoint();
                 context.eth_context.journal().checkpoint_commit();
-                context.eth_context.journal().finalize();
 
                 Ok(())
             }
@@ -1351,7 +1348,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 let _ = context.eth_context.journal().checkpoint();
                 context.eth_context.journal().checkpoint_commit();
-                context.eth_context.journal().finalize();
 
                 // storing the created address in a resigter
                 let nc_address_u32s = address_to_u32_vec(&new_contract_address.0);
@@ -1456,7 +1452,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 let check_point = context.eth_context.journal().checkpoint();
                 context.eth_context.journal().checkpoint_revert(check_point);
-                context.eth_context.journal().finalize();
 
                 Ok(())
             }

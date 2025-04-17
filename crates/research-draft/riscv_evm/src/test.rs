@@ -326,7 +326,7 @@ mod more_ecall_tests {
         vm::{VMErrors, Vm},
     };
     use revm::{
-        Context as RevmEthContext, MainContext,
+        Context as RevmEthContext, DatabaseCommit, MainContext,
         context::{ContextTr, JournalTr},
         database::{CacheDB, InMemoryDB},
         primitives::{Address, B256, Bytes, Log, LogData, U256, keccak256},
@@ -1031,6 +1031,9 @@ mod more_ecall_tests {
             let address_bytes = u32_vec_to_address(&[addr1, addr2, addr3, addr4, addr5]);
             // Validate it looks like an address (non-zero)
             assert!(address_bytes.iter().any(|&b| b != 0));
+
+            let changes = context.eth_context.journal().finalize();
+            context.eth_context.db().commit(changes.state);
 
             let new_contract = context
                 .eth_context
