@@ -250,16 +250,10 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
             }
             RiscvEVMECalls::CodeSize => {
                 // This function retruns the code of the currently excecuting contract
-                let contract_accout = context
+                let code_len = context
                     .eth_context
-                    .journaled_state
-                    .account(context.address)
-                    .clone();
-                let code_len = contract_accout
-                    .info
-                    .code
+                    .load_account_code(context.address)
                     .unwrap_or_default()
-                    .bytecode()
                     .len() as u32;
 
                 vm.registers.write_reg(CODE_SIZE_OUT_REGISTER, code_len);
@@ -274,19 +268,12 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let offset = vm.registers.read_reg(CODE_COPY_INPUT_REGISTER_2);
                 let size = vm.registers.read_reg(CODE_COPY_INPUT_REGISTER_3);
 
-                let contract_accout = context
+                let code = context
                     .eth_context
-                    .journaled_state
-                    .account(context.address)
-                    .clone();
-                let code = contract_accout
-                    .info
-                    .code
-                    .unwrap_or_default()
-                    .bytecode()
-                    .0
-                    .clone()
-                    .to_vec();
+                    .journal()
+                    .code(context.address)
+                    .map_err(|e| VMErrors::CodeLoadError(e.to_string()))?
+                    .data;
 
                 let mut data = Vec::new();
                 for i in offset as usize..(offset + size) as usize {
@@ -353,16 +340,11 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     address_u32_5,
                 ]);
 
-                let contract_accout = context
+                let code_len = context
                     .eth_context
-                    .journaled_state
-                    .account(Address::from(address))
-                    .clone();
-                let code_len = contract_accout
-                    .info
-                    .code
-                    .unwrap_or_default()
-                    .bytecode()
+                    .journal()
+                    .code(Address::from(address))
+                    .map_err(|e| VMErrors::CodeLoadError(e.to_string()))?
                     .len() as u32;
 
                 vm.registers
@@ -389,19 +371,12 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     address_u32_5,
                 ]);
 
-                let contract_accout = context
+                let code = context
                     .eth_context
-                    .journaled_state
-                    .account(Address::from(address))
-                    .clone();
-                let code = contract_accout
-                    .info
-                    .code
-                    .unwrap_or_default()
-                    .bytecode()
-                    .0
-                    .clone()
-                    .to_vec();
+                    .journal()
+                    .code(Address::from(address))
+                    .map_err(|e| VMErrors::CodeLoadError(e.to_string()))?
+                    .data;
 
                 let mut data = Vec::new();
                 for i in offset as usize..(offset + size) as usize {
@@ -907,7 +882,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let offset = vm.registers.read_reg(CREATE_INPUT_REGISTER_1);
                 let size = vm.registers.read_reg(CREATE_INPUT_REGISTER_2);
 
-                let mut init_code = vec![0u8; size as usize];
+                let mut init_code = Vec::with_capacity(size as usize);
 
                 for i in offset..(offset + size) {
                     init_code.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
@@ -926,7 +901,17 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8,
                 ]);
 
+                context
+                    .eth_context
+                    .journal()
+                    .load_account(context.address)
+                    .map_err(|_| VMErrors::VMCreateError(2))?;
                 let contract_creator = context.eth_context.caller();
+                context
+                    .eth_context
+                    .journal()
+                    .load_account(contract_creator)
+                    .map_err(|_| VMErrors::VMCreateError(2))?;
                 let old_nonce;
                 if let Some(nonce) = context
                     .eth_context
@@ -956,7 +941,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 new_context.address = new_contract_address;
                 new_context.current_caller = contract_creator;
                 new_context.eth_context = EthContext::mainnet().with_db(CacheDB::default());
-
                 let mut new_vm =
                     Vm::from_bin_u8(init_code).map_err(|_| VMErrors::VMCreateError(2))?;
                 new_vm.run(false, &mut new_context);
@@ -1179,12 +1163,15 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 let offset = vm.registers.read_reg(RETURN_INPUT_REGISTER_1);
                 let size = vm.registers.read_reg(RETURN_INPUT_REGISTER_2);
+                println!("Offset and Size: {} - {}", offset, size);
 
-                let mut data = vec![0u8; size as usize];
+                let mut data = Vec::new();
 
                 for i in offset..(offset + size) {
                     data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
                 }
+
+                println!("Data: {:?}", data);
 
                 context.return_data = data.into();
 
@@ -1272,7 +1259,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let offset = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_1);
                 let size = vm.registers.read_reg(CREATE_2_INPUT_REGISTER_2);
 
-                let mut init_code = vec![0u8; size as usize];
+                let mut init_code = Vec::with_capacity(size as usize);
 
                 for i in offset..(offset + size) {
                     init_code.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);
@@ -1304,7 +1291,17 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     salt_1, salt_2, salt_3, salt_4, salt_5, salt_6, salt_7, salt_8,
                 ]);
 
+                context
+                    .eth_context
+                    .journal()
+                    .load_account(context.address)
+                    .map_err(|_| VMErrors::VMCreateError(2))?;
                 let contract_creator = context.eth_context.caller();
+                context
+                    .eth_context
+                    .journal()
+                    .load_account(contract_creator)
+                    .map_err(|_| VMErrors::VMCreateError(2))?;
                 let old_nonce;
                 if let Some(nonce) = context
                     .eth_context
@@ -1449,7 +1446,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let offset = vm.registers.read_reg(REVERT_INPUT_REGISTER_1);
                 let size = vm.registers.read_reg(REVERT_INPUT_REGISTER_2);
 
-                let mut data = vec![0u8; size as usize];
+                let mut data = Vec::new();
 
                 for i in offset..(offset + size) {
                     data.push(vm.memory.read_mem(i, MemoryChuckSize::BYTE).unwrap() as u8);

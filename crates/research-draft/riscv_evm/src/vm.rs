@@ -31,6 +31,7 @@ pub enum VMErrors {
     VMCallError(u32),
     SLoadError(String),
     SStoreError(String),
+    CodeLoadError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -538,7 +539,7 @@ impl Vm {
                     }
                     0b1110011 => {
                         process_ecall(self, context)?;
-                        self.running = false;
+                        self.pc += 4;
                         Ok(true)
                     }
                     _ => return Err(VMErrors::InvalidOpcode(decoded_instruction.opcode)),
@@ -695,7 +696,7 @@ impl Vm {
                         // Funct3 for jal
                         self.pc += 4;
                         self.registers.write_reg(jtype.rd as u32, self.pc);
-                        self.pc += jtype.imm as u32;
+                        self.pc += jtype.imm as u32 - 4; // self.pc += imm "not" self.pc = self.pc + 4 + imm
                         Ok(true)
                     }
                     _ => return Err(VMErrors::InvalidOpcode(decoded_instruction.opcode)),
@@ -708,14 +709,21 @@ impl Vm {
     /// This function will run the Vm until it halts.
     /// The Vm will halt if the program counter is out of bounds or if the instruction is a halt.
     pub fn run(&mut self, debug_mode: bool, context: &mut Context) {
+        let mut count = 0;
         self.running = true;
         while self.running {
             match self.step(debug_mode, context) {
-                Ok(true) => continue,
+                Ok(true) => {
+                    count += 1;
+                    if count > 100 {
+                        self.running = false;
+                    } else {
+                        continue;
+                    }
+                }
                 Ok(false) => break,
                 Err(e) => {
                     match e {
-                        VMErrors::EnvironmentError => {} // would just be halting the program, sysytem calls are not allowed on the VM
                         _ => {
                             eprintln!("Error at pc: {:x} - error: {:?}", self.pc, e);
                         }
@@ -730,7 +738,10 @@ impl Vm {
 #[cfg(test)]
 mod test {
     use super::Vm;
-    use crate::{context::Context, utils::u32_vec_to_bytes};
+    use crate::{
+        context::Context,
+        utils::{bytes_to_u32_vec, u32_vec_to_bytes},
+    };
     use revm::{Context as EthContext, MainContext, database::CacheDB};
 
     #[test]
@@ -756,5 +767,43 @@ mod test {
         let mut context = Context::new(eth_context);
         let mut vm = Vm::from_bin_u8(code).unwrap();
         vm.run(true, &mut context);
+    }
+
+    #[test]
+    fn test_vm_run_with_u8_2() {
+        let het_i = [
+            0, 0, 0, 147, 0, 0, 1, 19, 0, 0, 1, 147, 0, 0, 2, 19, 0, 0, 2, 147, 0, 0, 3, 19, 0, 0,
+            3, 147, 0, 0, 4, 19, 0, 0, 4, 147, 0, 0, 5, 19, 0, 0, 5, 147, 0, 0, 6, 19, 0, 0, 6,
+            147, 0, 0, 7, 19, 0, 0, 7, 147, 0, 16, 8, 19, 5, 80, 15, 147, 0, 0, 0, 115, 6, 64, 2,
+            147, 35, 64, 3, 19, 64, 83, 1, 179, 0, 80, 0, 179, 0, 48, 1, 51, 15, 48, 15, 147, 0, 0,
+            0, 115, 0, 0, 0, 147, 3, 144, 15, 147, 0, 0, 0, 115, 3, 112, 1, 147, 0, 49, 12, 99, 2,
+            0, 1, 147, 10, 49, 4, 99, 5, 80, 1, 147, 16, 49, 0, 99, 25, 192, 0, 111, 0, 0, 0, 147,
+            0, 0, 1, 19, 0, 0, 1, 147, 0, 0, 2, 19, 0, 0, 2, 147, 0, 0, 3, 19, 0, 0, 3, 147, 0, 0,
+            4, 19, 5, 64, 15, 147, 0, 0, 0, 115, 0, 24, 8, 19, 0, 8, 4, 99, 3, 192, 0, 111, 0, 23,
+            135, 147, 2, 7, 154, 99, 0, 23, 7, 19, 2, 7, 22, 99, 0, 22, 134, 147, 2, 6, 146, 99, 0,
+            22, 6, 19, 0, 6, 30, 99, 0, 21, 133, 147, 0, 5, 154, 99, 0, 21, 5, 19, 0, 5, 22, 99, 0,
+            20, 132, 147, 0, 4, 146, 99, 0, 0, 0, 147, 0, 0, 1, 19, 0, 0, 1, 147, 0, 0, 2, 19, 0,
+            0, 2, 147, 0, 0, 3, 19, 0, 0, 3, 147, 0, 0, 4, 19, 5, 80, 15, 147, 0, 0, 0, 115, 11,
+            192, 0, 111, 0, 0, 0, 147, 0, 0, 1, 19, 0, 0, 1, 147, 0, 0, 2, 19, 0, 0, 2, 147, 0, 0,
+            3, 19, 0, 0, 3, 147, 0, 0, 4, 19, 5, 64, 15, 147, 0, 0, 0, 115, 255, 129, 1, 19, 0,
+            145, 32, 35, 0, 161, 34, 35, 0, 177, 36, 35, 0, 193, 38, 35, 0, 209, 40, 35, 0, 225,
+            42, 35, 0, 241, 44, 35, 1, 1, 46, 35, 0, 32, 0, 179, 0, 128, 1, 19, 15, 48, 15, 147, 0,
+            0, 0, 115, 0, 129, 1, 19, 0, 64, 0, 147, 3, 80, 15, 147, 0, 0, 0, 115, 0, 48, 5, 51, 0,
+            64, 5, 179, 0, 80, 6, 51, 0, 96, 6, 179, 0, 112, 7, 51, 0, 128, 7, 179, 0, 144, 8, 51,
+            0, 32, 4, 179, 0, 0, 0, 147, 0, 0, 1, 19, 0, 0, 1, 147, 0, 0, 2, 19, 0, 0, 2, 147, 0,
+            0, 3, 19, 0, 0, 3, 147, 0, 0, 4, 19, 5, 80, 15, 147, 0, 0, 0, 115, 0, 64, 0, 111, 255,
+            129, 1, 19, 5, 80, 15, 147, 0, 0, 1, 147, 0, 16, 2, 19, 0, 49, 32, 35, 0, 49, 34, 35,
+            0, 49, 36, 35, 0, 49, 38, 35, 0, 49, 40, 35, 0, 49, 42, 35, 0, 49, 44, 35, 0, 65, 46,
+            35, 0, 32, 0, 179, 0, 128, 1, 19, 15, 48, 15, 147, 0, 0, 0, 115, 0, 129, 1, 19, 251,
+            223, 240, 111, 0, 0, 0, 147, 0, 0, 1, 19, 15, 208, 15, 147, 0, 0, 0, 115,
+        ];
+        let u32_vec = bytes_to_u32_vec(&het_i);
+
+        for i in u32_vec {
+            let eth_context = EthContext::mainnet().with_db(CacheDB::default());
+            let mut context = Context::new(eth_context);
+            let mut vm = Vm::from_bin(vec![i]).unwrap();
+            vm.run(true, &mut context);
+        }
     }
 }
