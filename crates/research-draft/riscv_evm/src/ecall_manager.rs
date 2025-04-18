@@ -1,4 +1,4 @@
-#![allow(unused_assignments, unused_variables)]
+#![allow(unused)]
 
 use crate::{
     context::Context,

@@ -1,22 +1,27 @@
 #[cfg(test)]
-mod basic_tests {
-    use super::*;
+mod tests {
     use crate::{
         context::Context,
         ecall_manager::process_ecall,
-        utils::{address_to_u32_vec, bytes_to_u32, u32_vec_to_address, u32_vec_to_u256},
+        utils::{
+            address_to_u32_vec, bytes_to_u32, split_u64_to_u32, u32_vec_to_address,
+            u32_vec_to_bytes,
+        },
         vm::Vm,
     };
     use revm::{
-        Context as RevmEthContext, MainContext,
-        database::CacheDB,
-        primitives::{Address, B256, Bytes, U256, keccak256},
+        Context as RevmEthContext, DatabaseCommit, MainContext,
+        context::{ContextTr, JournalTr},
+        database::{CacheDB, InMemoryDB},
+        primitives::{Address, TxKind, U256, keccak256},
+        state::{AccountInfo, Bytecode},
     };
-    use riscv_evm_core::{MemoryChuckSize, e_constants::*, interfaces::MemoryInterface};
+    use riscv_evm_core::{MemoryChuckSize, Registers, e_constants::*, interfaces::MemoryInterface};
+    use std::str::FromStr;
 
     // Helper function to create test VM and Context
     fn setup() -> (Vm, Context) {
-        let mut vm = Vm::new();
+        let vm = Vm::new();
         let eth_context = RevmEthContext::mainnet().with_db(CacheDB::default());
         let mut context = Context::new(eth_context);
 
@@ -26,6 +31,43 @@ mod basic_tests {
             0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67,
         ]);
         context.address = test_address;
+
+        (vm, context)
+    }
+
+    // Helper function to create test VM and Context
+    fn setup_2() -> (Vm, Context) {
+        let vm = Vm::new();
+        let eth_context = RevmEthContext::mainnet().with_db(CacheDB::default());
+        let mut context = Context::new(eth_context);
+
+        // Set up a test address
+        let test_address = Address::from([
+            0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB,
+            0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67,
+        ]);
+        context.address = test_address;
+
+        // Set up a caller address
+        let caller_address = Address::from([
+            0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+            0x99, 0x00, 0xAA, 0xBB, 0xCC, 0xDD,
+        ]);
+        context.current_caller = caller_address;
+
+        // Set test transaction value
+        context.eth_context.modify_tx(|tx| {
+            tx.value = U256::from(1000000);
+            tx.caller = caller_address;
+        });
+
+        // Set test block properties
+        context.eth_context.modify_block(|block| {
+            block.timestamp = 1234567890;
+            block.number = 12345678;
+            block.beneficiary =
+                Address::from_str("0x8888f1f195afa192cfee860698584c030f4c9db1").unwrap();
+        });
 
         (vm, context)
     }
@@ -311,70 +353,10 @@ mod basic_tests {
         let result = process_ecall(&mut vm, &mut context);
         assert!(result.is_err());
     }
-}
-
-#[cfg(test)]
-mod more_ecall_tests {
-    use super::*;
-    use crate::{
-        context::Context,
-        ecall_manager::process_ecall,
-        utils::{
-            address_to_u32_vec, bytes_to_u32, combine_u32_to_u64, split_u64_to_u32,
-            u32_vec_to_address, u32_vec_to_bytes, u32_vec_to_u256,
-        },
-        vm::{VMErrors, Vm},
-    };
-    use revm::{
-        Context as RevmEthContext, DatabaseCommit, MainContext,
-        context::{ContextTr, JournalTr},
-        database::{CacheDB, InMemoryDB},
-        primitives::{Address, B256, Bytes, Log, LogData, TxKind, U256, keccak256},
-        state::{AccountInfo, Bytecode},
-    };
-    use riscv_evm_core::{MemoryChuckSize, Registers, e_constants::*, interfaces::MemoryInterface};
-    use std::str::FromStr;
-
-    // Helper function to create test VM and Context
-    fn setup() -> (Vm, Context) {
-        let mut vm = Vm::new();
-        let eth_context = RevmEthContext::mainnet().with_db(CacheDB::default());
-        let mut context = Context::new(eth_context);
-
-        // Set up a test address
-        let test_address = Address::from([
-            0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB,
-            0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67,
-        ]);
-        context.address = test_address;
-
-        // Set up a caller address
-        let caller_address = Address::from([
-            0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-            0x99, 0x00, 0xAA, 0xBB, 0xCC, 0xDD,
-        ]);
-        context.current_caller = caller_address;
-
-        // Set test transaction value
-        context.eth_context.modify_tx(|tx| {
-            tx.value = U256::from(1000000);
-            tx.caller = caller_address;
-        });
-
-        // Set test block properties
-        context.eth_context.modify_block(|block| {
-            block.timestamp = 1234567890;
-            block.number = 12345678;
-            block.beneficiary =
-                Address::from_str("0x8888f1f195afa192cfee860698584c030f4c9db1").unwrap();
-        });
-
-        (vm, context)
-    }
 
     #[test]
     fn test_balance() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         let mut db = InMemoryDB::default();
         let test_address = Address::from_str("0x0000000000000000000000000000000000000003").unwrap();
@@ -440,7 +422,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_origin_and_caller() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Test Origin
         vm.registers.write_reg(ECALL_CODE_REG, 0x32); // Origin
@@ -501,7 +483,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_call_value() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Set up ECALL
         vm.registers.write_reg(ECALL_CODE_REG, 0x34); // CallValue
@@ -548,7 +530,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_code_operations() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Setup test code in contract account
         let test_code = vec![0x60, 0x80, 0x60, 0x40, 0x52, 0x34, 0x80, 0x15]; // Some bytecode
@@ -601,7 +583,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_external_code_operations() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Setup test address and code
         let test_address = Address::from([
@@ -687,7 +669,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_return_data_operations() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Set up test return data
         let return_data = b"Test return data from previous call";
@@ -727,7 +709,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_block_operations() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Test BlockHash
         vm.registers.write_reg(ECALL_CODE_REG, 0x40); // BlockHash
@@ -794,7 +776,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_network_operations() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Set test chain ID
         context.eth_context.modify_cfg(|cfg| {
@@ -819,7 +801,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_self_balance() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Set test balance for contract
         let balance = U256::from(987654321);
@@ -873,7 +855,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_log_operations() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Setup test data for log
         let log_data = b"Log test data";
@@ -927,7 +909,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_return_and_revert() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Setup test data
         let return_data = b"Return or revert data";
@@ -960,7 +942,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_create_operation() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Setup test data for contract creation
         let init_code: Vec<u32> = vec![
@@ -1048,7 +1030,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_create2_operation() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Setup test data for contract creation
         let init_code: Vec<u32> = vec![
@@ -1154,7 +1136,7 @@ mod more_ecall_tests {
 
     #[test]
     fn test_call_operation() {
-        let (mut vm, mut context) = setup();
+        let (mut vm, mut context) = setup_2();
 
         // Setup test data for contract creation
         let init_code: Vec<u32> = vec![
