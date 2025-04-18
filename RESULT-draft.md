@@ -39,3 +39,5 @@ some ethereum opcodes almost consumes all the registers of the RISV VM (SSTORE, 
 3. It would be nice to have my concluding on the result placed in the beginning and end of the document.
 
 4. I can assure with high certainty that this experimental code is buggy and should not be used for anything looking like a production environment.
+
+5. What would ethereum look like in the next 20 years? Are we stucked with the EVM forever? For real, why do we need a VM other than the EVM?

@@ -10,7 +10,7 @@ use crate::{
 };
 use revm::{
     Context as EthContext, MainContext,
-    context::{ContextTr, JournalTr},
+    context::{ContextTr, JournalOutput, JournalTr},
     database::CacheDB,
     interpreter::Host,
     primitives::{Address, B256, Log, LogData, U256, keccak256},
@@ -18,7 +18,7 @@ use revm::{
 };
 use riscv_evm_core::{MemoryChuckSize, e_constants::*, interfaces::MemoryInterface};
 
-pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors> {
+pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<Vec<JournalOutput>, VMErrors> {
     let e_call_code = vm.registers.read_reg(ECALL_CODE_REG);
 
     match RiscvEVMECalls::from_u32(e_call_code) {
@@ -58,7 +58,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(KECCAK256_OUTPUT_REGITER_8, bytes_to_u32(&hash.0[28..32]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Address => {
                 // This branch would load the address of this current running contract from context
@@ -77,7 +77,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(ADDRESS_REGISTER_5, bytes_to_u32(&address[16..20]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Balance => {
                 // Construct the address that is to be read by reading 5 registers, reconstruct the address
@@ -121,7 +121,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(BALANCE_OUTPUT_REGISTER_8, bytes_to_u32(&balance[28..32]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Origin => {
                 let origin = context.eth_context.tx.caller.0;
@@ -138,7 +138,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(ORIGIN_OUTPUT_REGISTER_5, bytes_to_u32(&origin[16..20]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Caller => {
                 let origin = context.current_caller.0;
@@ -155,7 +155,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(CALLER_OUTPUT_REGISTER_5, bytes_to_u32(&origin[16..20]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::CallValue => {
                 // Load the vaule from context into a 8 registers
@@ -179,7 +179,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(CALL_VALUE_OUTPUT_REGISTER_8, bytes_to_u32(&value[28..32]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::CallDataLoad => {
                 // This would load 32bytes of the call data to 8 registers
@@ -217,7 +217,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     bytes_to_u32(&data[28..32]),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::CallDataSize => {
                 // This load to a register the number of bytes present in the calldata
@@ -226,7 +226,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 vm.registers.write_reg(CALL_DATA_SIZE_OUTPUT_REGISTER, size);
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::CallDataCopy => {
                 // Loads the dest_offset, offset and size from registers
@@ -246,7 +246,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
                 }
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::CodeSize => {
                 // This function retruns the code of the currently excecuting contract
@@ -258,7 +258,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 vm.registers.write_reg(CODE_SIZE_OUT_REGISTER, code_len);
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::CodeCopy => {
                 // This copies the code of the current running contract to memory
@@ -287,7 +287,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
                 }
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::GasPrice => {
                 // This returns the gas price in the current enviroment
@@ -321,7 +321,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     bytes_to_u32(&gas_price[28..32]),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::ExtCodeSize => {
                 // This would copy the code of a given address to memory
@@ -350,7 +350,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(EXT_CODE_SIZE_INPUT_REGISTER_6, code_len);
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::ExtCodeCopy => {
                 let address_u32_1 = vm.registers.read_reg(EXT_CODE_COPY_INPUT_REGISTER_1);
@@ -390,7 +390,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
                 }
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::ReturnDataSize => {
                 // This returns the size of the return data from the last call/frame
@@ -400,7 +400,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(RETURN_DATA_SIZE_OUTPUT_REGISTER, data_len);
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::ReturnDataCopy => {
                 let dest_offset = vm.registers.read_reg(RETURN_DATA_COPY_INPUT_REGISTER_1);
@@ -421,7 +421,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
                 }
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::ExtCodeHash => {
                 let address_u32_1 = vm.registers.read_reg(EXT_CODE_HASH_INPUT_REGISTER_1);
@@ -478,7 +478,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     bytes_to_u32(&code_hash[28..32]),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::BlockHash => {
                 // This would load the block_number from two register
@@ -526,7 +526,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     bytes_to_u32(&bloch_hash[28..32]),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Coinbase => {
                 let address = context.eth_context.block.beneficiary.0.0;
@@ -543,7 +543,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(COINBASE_OUTPUT_REGISTER_5, bytes_to_u32(&address[16..20]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Timestamp => {
                 let timestamp = context.eth_context.block.timestamp;
@@ -554,7 +554,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(TIMESTAMP_OUTPUT_REGISTER_2, timestamp_low);
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Number => {
                 let number = context.eth_context.block.number;
@@ -564,7 +564,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     .write_reg(NUMBER_OUTPUT_REGISTER_1, number_high);
                 vm.registers.write_reg(NUMBER_OUTPUT_REGISTER_2, number_low);
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::PrevRandao => {
                 // This allows a smart contract to access randomness (pseduo randomness), using an accumualation of a Randomness DAO for validators
@@ -608,7 +608,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     bytes_to_u32(&prev_randao[28..32]),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::GasLimit => {
                 // This obtains the blocks gas limit and writes it to register
@@ -642,7 +642,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     bytes_to_u32(&gas_limit[28..32]),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::ChainId => {
                 // Loading the chain ID into registers
@@ -654,7 +654,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(CHAIN_ID_OUTPUT_REGISTER_2, chain_id_low);
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::SelfBalance => {
                 // This gets the balance of the current contract
@@ -696,7 +696,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     bytes_to_u32(&balance[28..32]),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::BaseFee => {
                 let base_fee: [u8; 32] = context.eth_context.basefee().to_be_bytes();
@@ -719,7 +719,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(BASE_FEE_OUTPUT_REGISTER_8, bytes_to_u32(&base_fee[28..32]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::BlobHash => {
                 let index = vm.registers.read_reg(BLOB_HASH_OUTPUT_REGISTER_1);
@@ -747,7 +747,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(BLOB_HASH_OUTPUT_REGISTER_9, bytes_to_u32(&base_fee[28..32]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::BlobBaseFee => {
                 let base_fee: [u8; 32] = context.eth_context.blob_gasprice().to_be_bytes();
@@ -786,7 +786,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     bytes_to_u32(&base_fee[28..32]),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Gas => {
                 // Return the amount of gas left to 8 registers (this vm is not gas metered yet... :())
@@ -810,7 +810,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(GAS_OUTPUT_REGISTER_8, bytes_to_u32(&gas_left[28..32]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Log0 => {
                 let offset = vm.registers.read_reg(LOG0_INPUT_REGISTER_1);
@@ -829,7 +829,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 };
                 context.eth_context.log(log);
 
-                Ok(())
+                Ok(vec![context.eth_context.journal().finalize()])
             }
             RiscvEVMECalls::Log1 => {
                 let offset = vm.registers.read_reg(LOG1_INPUT_REGISTER_1);
@@ -860,19 +860,19 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 };
                 context.eth_context.log(log);
 
-                Ok(())
+                Ok(vec![context.eth_context.journal().finalize()])
             }
             RiscvEVMECalls::Log2 => {
                 // TODO: Implement Log2 (would not be implementing this, it would consume to much registers, a better way to go around this would to store the topic in memory not in a register (or stack in the case of the native evm))
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Log3 => {
                 // TODO: Implement Log3 (would not be implementing this, it would consume to much registers, a better way to go around this would to store the topic in memory not in a register (or stack in the case of the native evm))
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Log4 => {
                 // TODO: Implement Log4 (would not be implementing this, it would consume to much registers, a better way to go around this would to store the topic in memory not in a register (or stack in the case of the native evm))
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::Create => {
                 // First the initcode is obtained from the tx.data
@@ -944,6 +944,9 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     Vm::from_bin_u8(init_code).map_err(|_| VMErrors::VMCreateError(2))?;
                 new_vm.run(false, &mut new_context);
 
+                let _ = new_context.eth_context.journal().checkpoint();
+                new_context.eth_context.journal().checkpoint_commit();
+
                 let runtime_code = new_context.return_data;
 
                 context
@@ -974,7 +977,10 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(CREATE_OUTPUT_REGISTER_5, nc_address_u32s[4]);
 
-                Ok(())
+                Ok(vec![
+                    context.eth_context.journal().finalize(),
+                    new_context.eth_context.journal().finalize(),
+                ])
             }
             RiscvEVMECalls::Call => {
                 // This would create a sub context, execute the code of the contract that is being called
@@ -1069,7 +1075,10 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
                 }
 
-                Ok(())
+                Ok(vec![
+                    context.eth_context.journal().finalize(),
+                    new_context.eth_context.journal().finalize(),
+                ])
             }
             RiscvEVMECalls::CallCode => {
                 // Similar to Call but uses code from specified address while keeping context of current contract
@@ -1161,7 +1170,10 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
                 }
 
-                Ok(())
+                Ok(vec![
+                    context.eth_context.journal().finalize(),
+                    new_context.eth_context.journal().finalize(),
+                ])
             }
             RiscvEVMECalls::Return => {
                 // This ECALL Halts the vm returning the output
@@ -1169,7 +1181,6 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
 
                 let offset = vm.registers.read_reg(RETURN_INPUT_REGISTER_1);
                 let size = vm.registers.read_reg(RETURN_INPUT_REGISTER_2);
-                println!("Offset and Size: {} - {}", offset, size);
 
                 let mut data = Vec::new();
 
@@ -1182,7 +1193,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let _ = context.eth_context.journal().checkpoint();
                 context.eth_context.journal().checkpoint_commit();
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::DelegateCall => {
                 // Similar to CallCode but also keeps sender and value from original call
@@ -1251,7 +1262,10 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
                 }
 
-                Ok(())
+                Ok(vec![
+                    context.eth_context.journal().finalize(),
+                    new_context.eth_context.journal().finalize(),
+                ])
             }
             RiscvEVMECalls::Create2 => {
                 // First the initcode is obtained from the tx.data
@@ -1367,7 +1381,10 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(CREATE_2_OUTPUT_REGISTER_5, nc_address_u32s[4]);
 
-                Ok(())
+                Ok(vec![
+                    context.eth_context.journal().finalize(),
+                    new_context.eth_context.journal().finalize(),
+                ])
             }
             RiscvEVMECalls::StaticCall => {
                 // Similar to Call but in static mode - cannot modify state
@@ -1436,7 +1453,10 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                         .write_mem(byte_addr as u32, MemoryChuckSize::BYTE, *byte as u32);
                 }
 
-                Ok(())
+                Ok(vec![
+                    context.eth_context.journal().finalize(),
+                    new_context.eth_context.journal().finalize(),
+                ])
             }
             RiscvEVMECalls::Revert => {
                 // This ECALL Halts the vm returning the output, reverting state changes using the journal
@@ -1456,7 +1476,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 let check_point = context.eth_context.journal().checkpoint();
                 context.eth_context.journal().checkpoint_revert(check_point);
 
-                Ok(())
+                Ok(vec![context.eth_context.journal().finalize()])
             }
             RiscvEVMECalls::SLoad => {
                 let slot_1 = vm.registers.read_reg(SLOAD_INPUT_REGISTER_1);
@@ -1504,7 +1524,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                 vm.registers
                     .write_reg(SLOAD_OUTPUT_REGISTER_8, bytes_to_u32(&value[28..32]));
 
-                Ok(())
+                Ok(vec![])
             }
             RiscvEVMECalls::SStore => {
                 let slot_1 = vm.registers.read_reg(SSTORE_INPUT_REGISTER_1);
@@ -1544,7 +1564,7 @@ pub fn process_ecall(vm: &mut Vm, context: &mut Context) -> Result<(), VMErrors>
                     U256::from_be_bytes(value),
                 );
 
-                Ok(())
+                Ok(vec![])
             }
         },
         None => Err(VMErrors::EnvironmentError),
