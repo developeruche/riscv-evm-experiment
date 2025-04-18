@@ -5,3 +5,4 @@ pub mod instructions;
 pub mod test;
 pub mod utils;
 pub mod vm;
+pub use riscv_evm_core;

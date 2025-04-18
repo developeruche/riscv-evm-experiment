@@ -1,3 +1,4 @@
+# This is still a work in progress (I have been very lazy :(
 # SPDX-License-Identifier: MIT
 # Basic ERC20 Token in RISC-V RV32IM Assembly (Illustrative)
 

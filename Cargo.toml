@@ -1,5 +1,5 @@
 [workspace]
-members = [ "bins/e2e-tests", "crates/research-draft/riscv_evm", "crates/research-draft/riscv_evm_core","crates/research-final/benchmarks", "crates/research-final/handler", "crates/research-final/primitives"]
+members = [ "bins/e2e-tests", "crates/research-draft/counter_riscvim32_smart_contract_asm", "crates/research-draft/riscv_evm", "crates/research-draft/riscv_evm_core","crates/research-final/benchmarks", "crates/research-final/handler", "crates/research-final/primitives"]
 
 
 
@@ -29,8 +29,12 @@ alloy-sol-types = { version = "0.8.2", default-features = false }
 primitives = { path = "crates/research-final/primitives"}
 handler = { path = "crates/research-final/handler"}
 riscv_evm_core = { path = "crates/research-draft/riscv_evm_core"}
+riscv_evm = { path = "crates/research-draft/riscv_evm"}
 
 #misc 
 auto_impl = "1.2.0"
 hashbrown = "0.14.5"
 hex = "0.4.3"
+
+# riscv assembler
+riscv_assembler = "0.1.0"

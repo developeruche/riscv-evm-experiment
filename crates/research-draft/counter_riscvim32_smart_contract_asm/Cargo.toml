@@ -1,0 +1,9 @@
+[package]
+name = "counter_riscvim32_smart_contract_asm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+riscv_assembler.workspace = true
+riscv_evm.workspace = true
+revm.workspace = true
